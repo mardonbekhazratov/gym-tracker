@@ -8,6 +8,7 @@ import {
 } from '../db/queries';
 import { SetRow } from './SetRow';
 import { displayWeight } from '../lib/units';
+import { useStore } from '../store/useStore';
 
 interface Props {
   exercise: Exercise;
@@ -15,6 +16,7 @@ interface Props {
   units: 'kg' | 'lb';
   expanded: boolean;
   onToggle: () => void;
+  triggerRest?: boolean;
 }
 
 export function ExerciseCard({
@@ -23,11 +25,13 @@ export function ExerciseCard({
   units,
   expanded,
   onToggle,
+  triggerRest = true,
 }: Props) {
   const [sets, setSets] = useState<SetLog[]>([]);
   const [ghostSets, setGhostSets] = useState<SetLog[]>([]);
   const [ghostDate, setGhostDate] = useState<string | null>(null);
   const [extraSets, setExtraSets] = useState(0);
+  const startRest = useStore((s) => s.startRest);
 
   const refresh = useCallback(async () => {
     const current = await setsForSessionAndExercise(sessionId, exercise.slug);
@@ -85,6 +89,13 @@ export function ExerciseCard({
       reps: data.reps,
       rir: data.rir,
     });
+    if (triggerRest) {
+      startRest({
+        exerciseSlug: exercise.slug,
+        exerciseName: exercise.name,
+        seconds: exercise.restSeconds,
+      });
+    }
     await refresh();
   }
 

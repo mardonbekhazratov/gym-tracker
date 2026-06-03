@@ -12,11 +12,14 @@ const DAYS: { key: DayKey; short: string }[] = [
 ];
 
 export function TodayScreen() {
-  const { selectedDay, setSelectedDay, expandedExerciseSlug, setExpandedExerciseSlug } = useStore();
+  const selectedDay = useStore((s) => s.selectedDay);
+  const setSelectedDay = useStore((s) => s.setSelectedDay);
+  const expandedExerciseSlug = useStore((s) => s.expandedExerciseSlug);
+  const setExpandedExerciseSlug = useStore((s) => s.setExpandedExerciseSlug);
+  const units = useStore((s) => s.units);
   const [template, setTemplate] = useState<DayTemplate | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [session, setSession] = useState<Session | null>(null);
-  const [units, setUnits] = useState<'kg' | 'lb'>('kg');
   const [loading, setLoading] = useState(true);
 
   const today = todayISO();
@@ -27,9 +30,6 @@ export function TodayScreen() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const s = await db.settings.get(1);
-      if (s) setUnits(s.units);
-
       const tmpl = await db.dayTemplates.where('key').equals(selectedDay).first();
       if (!tmpl) {
         setTemplate(null);
