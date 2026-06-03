@@ -40,6 +40,8 @@ export interface Session {
   dayKey: DayKey;
   notes?: string;
   completed: boolean;
+  /** per-session exercise swaps: exerciseSlug → alternative display name. */
+  swaps?: Record<string, string>;
 }
 
 export interface SetLog {

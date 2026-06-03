@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Workout Tracker</string>
     <string name="title_activity_main">Workout Tracker</string>
-    <string name="package_name">com.ismoil.workouttracker</string>
-    <string name="custom_url_scheme">com.ismoil.workouttracker</string>
+    <string name="package_name">com.mardon.workouttracker</string>
+    <string name="custom_url_scheme">com.mardon.workouttracker</string>
 </resources>

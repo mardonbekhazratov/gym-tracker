@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { db, type DayKey, type DayTemplate, type Exercise, type Session } from '../db/db';
-import { getOrCreateSessionForToday, markSessionCompleted } from '../db/queries';
+import { db, type DayKey, type DayTemplate, type Exercise, type Session, type Settings } from '../db/db';
+import {
+  getOrCreateSessionForToday,
+  markSessionCompleted,
+  setSessionSwap,
+} from '../db/queries';
 import { ExerciseCard } from '../components/ExerciseCard';
+import { ExerciseSwapSheet } from '../components/ExerciseSwapSheet';
+import { DeloadBanner } from '../components/DeloadBanner';
+import { ProteinBadge } from '../components/ProteinBadge';
 import { useStore } from '../store/useStore';
-import { dayKeyForDate, formatDateLong, todayISO } from '../lib/dates';
+import { dayKeyForDate, formatDateLong, todayISO, weeksBetween } from '../lib/dates';
 
 const DAYS: { key: DayKey; short: string }[] = [
   { key: 'monday', short: 'Mon' },
@@ -20,16 +27,29 @@ export function TodayScreen() {
   const [template, setTemplate] = useState<DayTemplate | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [session, setSession] = useState<Session | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [swapTarget, setSwapTarget] = useState<Exercise | null>(null);
 
   const today = todayISO();
   const todayKey = useMemo(() => dayKeyForDate(), []);
   const isToday = todayKey === selectedDay;
 
+  const weeksSinceDeload = settings
+    ? weeksBetween(settings.lastDeloadDate ?? settings.programStartDate, today)
+    : 0;
+
+  const proteinGrams =
+    settings?.bodyweightForProteinKg && settings.proteinPerKg
+      ? Math.round(settings.bodyweightForProteinKg * settings.proteinPerKg)
+      : null;
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      const s = await db.settings.get(1);
+      if (s) setSettings(s);
       const tmpl = await db.dayTemplates.where('key').equals(selectedDay).first();
       if (!tmpl) {
         setTemplate(null);
@@ -69,6 +89,23 @@ export function TodayScreen() {
     if (updated) setSession(updated);
   }
 
+  async function handleMarkDeloadDone() {
+    if (!settings?.id) return;
+    await db.settings.update(settings.id, { lastDeloadDate: today });
+    const updated = await db.settings.get(settings.id);
+    if (updated) setSettings(updated);
+  }
+
+  async function handleSelectSwap(alternative: string | null) {
+    if (!swapTarget || !session?.id) return;
+    const updated = await setSessionSwap(
+      session.id,
+      swapTarget.slug,
+      alternative,
+    );
+    if (updated) setSession(updated);
+  }
+
   return (
     <div className="px-4 pt-5 pb-4 max-w-xl mx-auto">
       <header className="mb-3">
@@ -79,6 +116,14 @@ export function TodayScreen() {
           {template?.label ?? 'Pick a day'}
         </h1>
       </header>
+
+      <div className="space-y-2 mb-3">
+        <DeloadBanner
+          weeksSince={weeksSinceDeload}
+          onMarkDone={handleMarkDeloadDone}
+        />
+        <ProteinBadge grams={proteinGrams} />
+      </div>
 
       <div role="tablist" className="grid grid-cols-3 gap-2 mb-4">
         {DAYS.map((d) => {
@@ -125,6 +170,8 @@ export function TodayScreen() {
                   expandedExerciseSlug === ex.slug ? null : ex.slug,
                 )
               }
+              swappedTo={session.swaps?.[ex.slug] ?? null}
+              onOpenSwap={() => setSwapTarget(ex)}
             />
           ))}
 
@@ -144,6 +191,15 @@ export function TodayScreen() {
         <p className="text-slate-400 text-sm">
           No template for this day. Pick Mon, Wed, or Fri.
         </p>
+      )}
+
+      {swapTarget && (
+        <ExerciseSwapSheet
+          exercise={swapTarget}
+          current={session?.swaps?.[swapTarget.slug] ?? null}
+          onClose={() => setSwapTarget(null)}
+          onSelect={handleSelectSwap}
+        />
       )}
     </div>
   );

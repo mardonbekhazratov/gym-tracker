@@ -4,9 +4,11 @@ import { db, type Exercise, type Session } from '../db/db';
 import {
   markSessionCompleted,
   setsForSession,
+  setSessionSwap,
   updateSessionNotes,
 } from '../db/queries';
 import { ExerciseCard } from '../components/ExerciseCard';
+import { ExerciseSwapSheet } from '../components/ExerciseSwapSheet';
 import { useStore } from '../store/useStore';
 import { formatDateLong } from '../lib/dates';
 
@@ -19,6 +21,7 @@ export function SessionDetailScreen() {
   const [label, setLabel] = useState('');
   const [notes, setNotes] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [swapTarget, setSwapTarget] = useState<Exercise | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -58,6 +61,16 @@ export function SessionDetailScreen() {
     if (!session?.id) return;
     await markSessionCompleted(session.id, !session.completed);
     const updated = await db.sessions.get(session.id);
+    if (updated) setSession(updated);
+  }
+
+  async function handleSelectSwap(alternative: string | null) {
+    if (!swapTarget || !session?.id) return;
+    const updated = await setSessionSwap(
+      session.id,
+      swapTarget.slug,
+      alternative,
+    );
     if (updated) setSession(updated);
   }
 
@@ -109,6 +122,8 @@ export function SessionDetailScreen() {
             expanded={expanded === ex.slug}
             onToggle={() => setExpanded(expanded === ex.slug ? null : ex.slug)}
             triggerRest={false}
+            swappedTo={session.swaps?.[ex.slug] ?? null}
+            onOpenSwap={() => setSwapTarget(ex)}
           />
         ))}
       </div>
@@ -124,6 +139,15 @@ export function SessionDetailScreen() {
           ? '✓ Marked done — tap to reopen'
           : 'Mark session done'}
       </button>
+
+      {swapTarget && (
+        <ExerciseSwapSheet
+          exercise={swapTarget}
+          current={session.swaps?.[swapTarget.slug] ?? null}
+          onClose={() => setSwapTarget(null)}
+          onSelect={handleSelectSwap}
+        />
+      )}
     </div>
   );
 }

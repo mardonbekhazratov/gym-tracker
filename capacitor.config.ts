@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.ismoil.workouttracker',
+  appId: 'com.mardon.workouttracker',
   appName: 'Workout Tracker',
   webDir: 'dist',
   android: {

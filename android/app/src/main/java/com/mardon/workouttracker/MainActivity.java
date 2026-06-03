@@ -1,4 +1,4 @@
-package com.ismoil.workouttracker;
+package com.mardon.workouttracker;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -1,4 +1,4 @@
-import { db, type BodyWeight, type SetLog, type Session, type DayKey } from './db';
+import { db, type BodyWeight, type SetLog, type Session, type DayKey, type MuscleGroup } from './db';
 import { todayISO } from '../lib/dates';
 
 export async function getOrCreateSessionForToday(
@@ -88,6 +88,20 @@ export async function updateSessionNotes(
   await db.sessions.update(sessionId, { notes });
 }
 
+export async function setSessionSwap(
+  sessionId: number,
+  exerciseSlug: string,
+  alternative: string | null,
+): Promise<Session | undefined> {
+  const sess = await db.sessions.get(sessionId);
+  if (!sess) return undefined;
+  const swaps = { ...(sess.swaps ?? {}) };
+  if (alternative) swaps[exerciseSlug] = alternative;
+  else delete swaps[exerciseSlug];
+  await db.sessions.update(sessionId, { swaps });
+  return db.sessions.get(sessionId);
+}
+
 export async function recordBodyWeight(
   date: string,
   weightKg: number,
@@ -160,4 +174,41 @@ export async function exerciseHistory(
 export async function listSessions(): Promise<Session[]> {
   const rows = await db.sessions.toArray();
   return rows.sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+function isoWeekBounds(ref: Date = new Date()): { from: string; to: string } {
+  const monday = new Date(ref);
+  const dow = monday.getDay(); // 0=Sun, 1=Mon
+  const offset = (dow + 6) % 7; // days since Monday
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - offset);
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  return { from: todayISO(monday), to: todayISO(sunday) };
+}
+
+export async function weeklyVolume(
+  ref: Date = new Date(),
+): Promise<{ counts: Partial<Record<MuscleGroup, number>>; from: string; to: string }> {
+  const { from, to } = isoWeekBounds(ref);
+  const sessions = await db.sessions.toArray();
+  const inWeek = sessions.filter((s) => s.date >= from && s.date <= to);
+  if (inWeek.length === 0) return { counts: {}, from, to };
+
+  const sessionIds = new Set(inWeek.map((s) => s.id!));
+  const allLogs = await db.setLogs.toArray();
+  const weekLogs = allLogs.filter((l) => sessionIds.has(l.sessionId));
+
+  const exercises = await db.exercises.toArray();
+  const muscleBySlug = new Map<string, MuscleGroup>(
+    exercises.map((e) => [e.slug, e.muscleGroup]),
+  );
+
+  const counts: Partial<Record<MuscleGroup, number>> = {};
+  for (const l of weekLogs) {
+    const mg = muscleBySlug.get(l.exerciseSlug);
+    if (!mg) continue;
+    counts[mg] = (counts[mg] ?? 0) + 1;
+  }
+  return { counts, from, to };
 }

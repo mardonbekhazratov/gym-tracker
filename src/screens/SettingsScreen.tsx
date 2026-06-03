@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { db, type Settings } from '../db/db';
 import { BodyWeightInput } from '../components/BodyWeightInput';
 import { useStore } from '../store/useStore';
 import { displayWeight, parseWeightToKg } from '../lib/units';
+import {
+  exportBackup,
+  importBackup,
+  resetAllData,
+  triggerDownload,
+  type BackupFile,
+} from '../lib/backup';
+import { todayISO } from '../lib/dates';
 
 export function SettingsScreen() {
   const units = useStore((s) => s.units);
@@ -11,6 +19,8 @@ export function SettingsScreen() {
   const [proteinPerKg, setProteinPerKg] = useState('1.8');
   const [bwForProtein, setBwForProtein] = useState('');
   const [bwTick, setBwTick] = useState(0);
+  const [status, setStatus] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void db.settings.get(1).then((s) => {
@@ -49,6 +59,61 @@ export function SettingsScreen() {
     }
     const kg = parseWeightToKg(bwForProtein, units);
     if (kg > 0) await persist({ bodyweightForProteinKg: kg });
+  }
+
+  async function handleExport() {
+    const backup = await exportBackup();
+    triggerDownload(
+      `workout-tracker-${todayISO()}.json`,
+      JSON.stringify(backup, null, 2),
+    );
+    setStatus(`Exported ${todayISO()}`);
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (
+      !window.confirm(
+        'Import will REPLACE all current data with the file contents. Continue?',
+      )
+    ) {
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as BackupFile;
+      await importBackup(parsed);
+      const reloaded = await db.settings.get(1);
+      if (reloaded) {
+        setSettings(reloaded);
+        setUnits(reloaded.units);
+      }
+      setStatus(`Imported ${file.name}`);
+    } catch (err) {
+      setStatus(
+        `Import failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  async function handleReset() {
+    if (
+      !window.confirm(
+        'Reset will erase all sessions, sets, and bodyweight history. The program seed will be restored. Continue?',
+      )
+    )
+      return;
+    await resetAllData();
+    const reloaded = await db.settings.get(1);
+    if (reloaded) {
+      setSettings(reloaded);
+      setUnits(reloaded.units);
+    }
+    setStatus('Data reset');
   }
 
   return (
@@ -128,6 +193,39 @@ export function SettingsScreen() {
             className="input mt-1"
           />
         </label>
+      </section>
+
+      <section className="card p-4 space-y-3">
+        <h2 className="font-semibold">Backup</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className="btn-ghost" onClick={handleExport}>
+            Export JSON
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => fileRef.current?.click()}
+          >
+            Import JSON
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            type="button"
+            onClick={handleReset}
+            className="tap col-span-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-semibold px-4 py-2"
+          >
+            Reset all data…
+          </button>
+        </div>
+        {status && (
+          <p className="text-xs text-slate-400">{status}</p>
+        )}
       </section>
 
       {/* used to silence unused-state warning when BodyWeightInput refreshes the chart */}

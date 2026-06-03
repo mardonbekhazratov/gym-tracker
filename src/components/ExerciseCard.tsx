@@ -17,6 +17,8 @@ interface Props {
   expanded: boolean;
   onToggle: () => void;
   triggerRest?: boolean;
+  swappedTo?: string | null;
+  onOpenSwap?: () => void;
 }
 
 export function ExerciseCard({
@@ -26,6 +28,8 @@ export function ExerciseCard({
   expanded,
   onToggle,
   triggerRest = true,
+  swappedTo,
+  onOpenSwap,
 }: Props) {
   const [sets, setSets] = useState<SetLog[]>([]);
   const [ghostSets, setGhostSets] = useState<SetLog[]>([]);
@@ -106,48 +110,66 @@ export function ExerciseCard({
 
   return (
     <section className="card overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="tap w-full flex items-center justify-between px-4 py-3 text-left"
-      >
-        <div className="min-w-0">
-          <h3 className="font-semibold text-slate-100 truncate">
-            {exercise.name}
-          </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {exercise.defaultSets} × {exercise.repLow}–{exercise.repHigh} ·{' '}
-            {exercise.restSeconds}s rest
-            {topSet && (
-              <>
-                {' · '}
-                <span className="text-slate-300">
-                  top {displayWeight(topSet.weightKg, units)}
-                  {units} × {topSet.reps}
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="tap flex-1 flex items-center justify-between px-4 py-3 text-left min-w-0"
+        >
+          <div className="min-w-0">
+            <h3 className="font-semibold text-slate-100 truncate">
+              {swappedTo ?? exercise.name}
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5 truncate">
+              {swappedTo && (
+                <span className="text-amber-300/90 mr-1">
+                  swap · for {exercise.name} ·{' '}
                 </span>
-              </>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <span
-            className={`text-xs rounded-full px-2 py-0.5 ${
-              completedSets >= exercise.defaultSets
-                ? 'bg-emerald-500/20 text-emerald-300'
-                : 'bg-slate-800 text-slate-300'
-            }`}
+              )}
+              {exercise.defaultSets} × {exercise.repLow}–{exercise.repHigh} ·{' '}
+              {exercise.restSeconds}s rest
+              {topSet && (
+                <>
+                  {' · '}
+                  <span className="text-slate-300">
+                    top {displayWeight(topSet.weightKg, units)}
+                    {units} × {topSet.reps}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0 ml-2">
+            <span
+              className={`text-xs rounded-full px-2 py-0.5 ${
+                completedSets >= exercise.defaultSets
+                  ? 'bg-emerald-500/20 text-emerald-300'
+                  : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              {completedSets}/{exercise.defaultSets}
+            </span>
+            <span
+              className={`text-slate-400 transition-transform ${
+                expanded ? 'rotate-180' : ''
+              }`}
+            >
+              ▾
+            </span>
+          </div>
+        </button>
+        {onOpenSwap && (
+          <button
+            type="button"
+            onClick={onOpenSwap}
+            className="tap px-3 text-slate-400 hover:text-slate-200 border-l border-slate-800"
+            aria-label="Swap exercise"
+            title="Swap exercise"
           >
-            {completedSets}/{exercise.defaultSets}
-          </span>
-          <span
-            className={`text-slate-400 transition-transform ${
-              expanded ? 'rotate-180' : ''
-            }`}
-          >
-            ▾
-          </span>
-        </div>
-      </button>
+            ⇄
+          </button>
+        )}
+      </div>
 
       {expanded && (
         <div className="px-3 pb-4 pt-1 border-t border-slate-800 space-y-2">

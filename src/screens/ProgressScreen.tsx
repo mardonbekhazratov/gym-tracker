@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { db, type Exercise } from '../db/db';
 import { ExerciseProgressChart } from '../components/ExerciseProgressChart';
 import { BodyWeightChart } from '../components/BodyWeightChart';
+import { WeeklyVolume } from '../components/WeeklyVolume';
 import { useStore } from '../store/useStore';
 
 export function ProgressScreen() {
@@ -23,6 +24,8 @@ export function ProgressScreen() {
   return (
     <div className="px-4 pt-5 pb-4 space-y-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold">Progress</h1>
+
+      <WeeklyVolume />
 
       <section className="card p-3 space-y-2">
         <label className="block">
