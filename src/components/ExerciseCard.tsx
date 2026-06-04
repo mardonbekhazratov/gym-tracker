@@ -7,29 +7,35 @@ import {
   upsertSetLog,
 } from '../db/queries';
 import { SetRow } from './SetRow';
+import { Icon } from './Icon';
 import { displayWeight } from '../lib/units';
 import { useStore } from '../store/useStore';
+import { BODYWEIGHT_ONLY_SLUGS } from '../data/program';
 
 interface Props {
   exercise: Exercise;
   sessionId: number;
+  sessionDate: string;
   units: 'kg' | 'lb';
   expanded: boolean;
   onToggle: () => void;
   triggerRest?: boolean;
   swappedTo?: string | null;
   onOpenSwap?: () => void;
+  bodyweightKg?: number | null;
 }
 
 export function ExerciseCard({
   exercise,
   sessionId,
+  sessionDate,
   units,
   expanded,
   onToggle,
   triggerRest = true,
   swappedTo,
   onOpenSwap,
+  bodyweightKg,
 }: Props) {
   const [sets, setSets] = useState<SetLog[]>([]);
   const [ghostSets, setGhostSets] = useState<SetLog[]>([]);
@@ -37,10 +43,12 @@ export function ExerciseCard({
   const [extraSets, setExtraSets] = useState(0);
   const startRest = useStore((s) => s.startRest);
 
+  const bodyweightOnly = BODYWEIGHT_ONLY_SLUGS.has(exercise.slug);
+
   const refresh = useCallback(async () => {
     const current = await setsForSessionAndExercise(sessionId, exercise.slug);
     setSets(current);
-    const ghost = await lastSessionForExercise(exercise.slug);
+    const ghost = await lastSessionForExercise(exercise.slug, sessionDate);
     if (ghost) {
       setGhostSets(ghost.sets);
       setGhostDate(ghost.session.date);
@@ -48,7 +56,7 @@ export function ExerciseCard({
       setGhostSets([]);
       setGhostDate(null);
     }
-  }, [sessionId, exercise.slug]);
+  }, [sessionId, exercise.slug, sessionDate]);
 
   useEffect(() => {
     void refresh();
@@ -59,6 +67,7 @@ export function ExerciseCard({
   }, [exercise.defaultSets, extraSets, sets.length]);
 
   const completedSets = sets.length;
+  const done = completedSets >= exercise.defaultSets;
 
   const topSet = useMemo<SetLog | null>(() => {
     if (sets.length === 0) return null;
@@ -75,7 +84,8 @@ export function ExerciseCard({
     existing: SetLog | undefined,
     data: { weightKg: number; reps: number; rir: number },
   ) {
-    if (data.weightKg <= 0 || data.reps <= 0) return;
+    if (data.reps <= 0) return;
+    if (!bodyweightOnly && data.weightKg <= 0) return;
     if (
       existing &&
       existing.weightKg === data.weightKg &&
@@ -117,44 +127,61 @@ export function ExerciseCard({
           className="tap flex-1 flex items-center justify-between px-4 py-3 text-left min-w-0"
         >
           <div className="min-w-0">
-            <h3 className="font-semibold text-slate-100 truncate">
+            <h3 className="font-semibold text-ink-50 truncate text-[15px] tracking-tighter- inline-flex items-center gap-1.5">
               {swappedTo ?? exercise.name}
+              {bodyweightOnly && (
+                <span className="text-[9px] font-bold tracking-[0.18em] text-ember-300 bg-ember-500/10 border border-ember-500/30 rounded px-1.5 py-0.5">
+                  BW
+                </span>
+              )}
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5 truncate">
+            <p className="text-xs text-ink-400 mt-0.5 truncate">
               {swappedTo && (
                 <span className="text-amber-300/90 mr-1">
                   swap · for {exercise.name} ·{' '}
                 </span>
               )}
-              {exercise.defaultSets} × {exercise.repLow}–{exercise.repHigh} ·{' '}
-              {exercise.restSeconds}s rest
-              {topSet && (
+              <span className="num">
+                {exercise.defaultSets} × {exercise.repLow}–{exercise.repHigh}
+              </span>
+              <span className="inline-flex items-center gap-1 ml-1.5 text-ink-500">
+                <Icon name="clock" size={11} />
+                <span className="num">{exercise.restSeconds}s</span>
+              </span>
+              {topSet && !bodyweightOnly && (
                 <>
                   {' · '}
-                  <span className="text-slate-300">
+                  <span className="text-ink-200 num">
                     top {displayWeight(topSet.weightKg, units)}
                     {units} × {topSet.reps}
                   </span>
                 </>
               )}
+              {topSet && bodyweightOnly && (
+                <>
+                  {' · '}
+                  <span className="text-ink-200 num">top {topSet.reps} reps</span>
+                </>
+              )}
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0 ml-2">
+          <div className="flex items-center gap-2 shrink-0 ml-2">
             <span
-              className={`text-xs rounded-full px-2 py-0.5 ${
-                completedSets >= exercise.defaultSets
-                  ? 'bg-emerald-500/20 text-emerald-300'
-                  : 'bg-slate-800 text-slate-300'
-              }`}
+              className={`text-[11px] num rounded-full px-2 py-0.5 font-semibold tracking-wide
+                ${
+                  done
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : 'bg-ink-800 text-ink-300'
+                }`}
             >
               {completedSets}/{exercise.defaultSets}
             </span>
             <span
-              className={`text-slate-400 transition-transform ${
+              className={`text-ink-400 transition-transform duration-200 ${
                 expanded ? 'rotate-180' : ''
               }`}
             >
-              ▾
+              <Icon name="chevron-down" size={18} />
             </span>
           </div>
         </button>
@@ -162,26 +189,29 @@ export function ExerciseCard({
           <button
             type="button"
             onClick={onOpenSwap}
-            className="tap px-3 text-slate-400 hover:text-slate-200 border-l border-slate-800"
+            className="tap px-3 text-ink-400 active:text-ink-100 border-l border-ink-800"
             aria-label="Swap exercise"
             title="Swap exercise"
           >
-            ⇄
+            <Icon name="swap" size={18} />
           </button>
         )}
       </div>
 
       {expanded && (
-        <div className="px-3 pb-4 pt-1 border-t border-slate-800 space-y-2">
+        <div className="px-3 pb-4 pt-2 border-t border-ink-800 space-y-2">
           {ghostDate && (
-            <p className="text-[11px] text-slate-500 px-1">
+            <p className="text-[11px] text-ink-500 px-1 inline-flex items-center gap-1.5">
+              <Icon name="history" size={12} />
               Last session {ghostDate} — beat it.
             </p>
           )}
 
-          <div className="grid grid-cols-[28px_1fr_1fr_1fr_auto] gap-2 px-1 pb-1 text-[10px] uppercase tracking-wider text-slate-500">
+          <div className="grid grid-cols-[28px_1fr_1fr_1fr_auto] gap-2 px-1 pb-1 label-eyebrow">
             <span></span>
-            <span className="text-center">Weight</span>
+            <span className="text-center">
+              {bodyweightOnly ? 'Body' : 'Weight'}
+            </span>
             <span className="text-center">Reps</span>
             <span className="text-center">RIR</span>
             <span></span>
@@ -200,6 +230,8 @@ export function ExerciseCard({
                 units={units}
                 targetRepLow={exercise.repLow}
                 targetRepHigh={exercise.repHigh}
+                bodyweightOnly={bodyweightOnly}
+                bodyweightKg={bodyweightKg}
                 onSave={(data) => handleSave(setNumber, existing, data)}
                 onDelete={
                   existing ? () => handleDelete(existing.id!) : undefined
@@ -214,7 +246,8 @@ export function ExerciseCard({
               className="btn-ghost flex-1"
               onClick={() => setExtraSets((n) => n + 1)}
             >
-              + Add set
+              <Icon name="plus" size={16} />
+              Add set
             </button>
           </div>
         </div>

@@ -28,7 +28,7 @@ const initialDay: DayKey = dayKeyForDate() ?? 'monday';
 
 export const useStore = create<UIState>((set, get) => ({
   selectedDay: initialDay,
-  setSelectedDay: (d) => set({ selectedDay: d, expandedExerciseSlug: null }),
+  setSelectedDay: (d) => set({ selectedDay: d }),
   expandedExerciseSlug: null,
   setExpandedExerciseSlug: (slug) => set({ expandedExerciseSlug: slug }),
 

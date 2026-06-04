@@ -9,6 +9,7 @@ import { ProgressScreen } from './screens/ProgressScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { db } from './db/db';
 import { useStore } from './store/useStore';
+import { ConfirmProvider } from './components/ui/ConfirmDialog';
 
 export default function App() {
   const setUnits = useStore((s) => s.setUnits);
@@ -20,18 +21,25 @@ export default function App() {
   }, [setUnits]);
 
   return (
-    <div className="min-h-full flex flex-col">
-      <main className="flex-1 pb-20">
-        <Routes>
-          <Route path="/" element={<TodayScreen />} />
-          <Route path="/history" element={<HistoryScreen />} />
-          <Route path="/history/:sessionId" element={<SessionDetailScreen />} />
-          <Route path="/progress" element={<ProgressScreen />} />
-          <Route path="/settings" element={<SettingsScreen />} />
-        </Routes>
-      </main>
-      <RestTimer />
-      <BottomNav />
-    </div>
+    <ConfirmProvider>
+      <div className="min-h-full flex flex-col">
+        {/* Soft status-bar scrim so content fades cleanly under the notch */}
+        <div
+          className="fixed inset-x-0 top-0 z-20 pointer-events-none h-safe-top
+            bg-gradient-to-b from-ink-950 via-ink-950/85 to-transparent"
+        />
+        <main className="flex-1 pt-safe pb-[calc(env(safe-area-inset-bottom)+84px)] px-safe">
+          <Routes>
+            <Route path="/" element={<TodayScreen />} />
+            <Route path="/history" element={<HistoryScreen />} />
+            <Route path="/history/:sessionId" element={<SessionDetailScreen />} />
+            <Route path="/progress" element={<ProgressScreen />} />
+            <Route path="/settings" element={<SettingsScreen />} />
+          </Routes>
+        </main>
+        <RestTimer />
+        <BottomNav />
+      </div>
+    </ConfirmProvider>
   );
 }

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { SetLog } from '../db/db';
 import { displayWeight, parseWeightToKg } from '../lib/units';
+import { Icon } from './Icon';
+import { NumberField } from './ui/NumberField';
 
 export interface SetRowProps {
   setNumber: number;
@@ -9,6 +11,10 @@ export interface SetRowProps {
   units: 'kg' | 'lb';
   targetRepLow: number;
   targetRepHigh: number;
+  /** When true, weight input is replaced by a BW tile and weight is auto-filled. */
+  bodyweightOnly?: boolean;
+  /** Latest bodyweight (kg) used as default weight for bodyweight-only exercises. */
+  bodyweightKg?: number | null;
   onSave: (data: { weightKg: number; reps: number; rir: number }) => Promise<void>;
   onDelete?: () => Promise<void>;
 }
@@ -20,6 +26,8 @@ export function SetRow({
   units,
   targetRepLow,
   targetRepHigh,
+  bodyweightOnly = false,
+  bodyweightKg,
   onSave,
   onDelete,
 }: SetRowProps) {
@@ -46,13 +54,17 @@ export function SetRow({
   const ghostReps = ghost ? String(ghost.reps) : null;
   const targetReps = `${targetRepLow}-${targetRepHigh}`;
 
-  const canSave = weight.trim() !== '' && reps.trim() !== '';
+  const canSave = bodyweightOnly
+    ? reps.trim() !== ''
+    : weight.trim() !== '' && reps.trim() !== '';
 
-  async function handleSave() {
+  async function commit() {
     if (!canSave || saving) return;
     setSaving(true);
     try {
-      const w = parseWeightToKg(weight, units);
+      const w = bodyweightOnly
+        ? existing?.weightKg ?? bodyweightKg ?? 0
+        : parseWeightToKg(weight, units);
       const r = Math.max(0, parseInt(reps, 10) || 0);
       const rirNum = Math.max(0, Math.min(5, parseInt(rir, 10) || 0));
       await onSave({ weightKg: w, reps: r, rir: rirNum });
@@ -63,64 +75,71 @@ export function SetRow({
 
   return (
     <div className="grid grid-cols-[28px_1fr_1fr_1fr_auto] gap-2 items-center">
-      <div className="text-slate-500 text-sm text-center">{setNumber}</div>
+      <div className="text-ink-500 text-sm text-center num font-semibold">
+        {setNumber}
+      </div>
 
-      <div className="relative">
-        <input
-          inputMode="decimal"
-          type="number"
-          step="0.5"
-          placeholder={ghostWeight ?? '—'}
+      {bodyweightOnly ? (
+        <div
+          className="field flex flex-col items-center justify-center gap-0 leading-none py-1.5 cursor-default select-none"
+          aria-label="Bodyweight"
+          title={
+            bodyweightKg
+              ? `Bodyweight ${displayWeight(bodyweightKg, units)} ${units}`
+              : 'Bodyweight (set yours in Settings)'
+          }
+        >
+          <span className="text-xs font-bold tracking-[0.18em] text-ember-300">BW</span>
+          {bodyweightKg ? (
+            <span className="text-[10px] text-ink-400 num">
+              {displayWeight(bodyweightKg, units)} {units}
+            </span>
+          ) : (
+            <span className="text-[10px] text-ink-500">—</span>
+          )}
+        </div>
+      ) : (
+        <NumberField
           value={weight}
-          onChange={(e) => setWeight(e.target.value)}
-          onBlur={handleSave}
-          className="input"
+          onChange={setWeight}
+          onCommit={() => void commit()}
+          placeholder={ghostWeight ?? '—'}
+          suffix={units}
+          step={2.5}
+          ariaLabel="Weight"
         />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">
-          {units}
-        </span>
-      </div>
+      )}
 
-      <div className="relative">
-        <input
-          inputMode="numeric"
-          type="number"
-          placeholder={ghostReps ?? targetReps}
-          value={reps}
-          onChange={(e) => setReps(e.target.value)}
-          onBlur={handleSave}
-          className="input"
-        />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">
-          reps
-        </span>
-      </div>
+      <NumberField
+        value={reps}
+        onChange={setReps}
+        onCommit={() => void commit()}
+        placeholder={ghostReps ?? targetReps}
+        suffix="reps"
+        step={1}
+        ariaLabel="Reps"
+      />
 
-      <div className="relative">
-        <input
-          inputMode="numeric"
-          type="number"
-          min={0}
-          max={5}
-          placeholder="RIR"
-          value={rir}
-          onChange={(e) => setRir(e.target.value)}
-          onBlur={handleSave}
-          className="input"
-        />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">
-          RIR
-        </span>
-      </div>
+      <NumberField
+        value={rir}
+        onChange={setRir}
+        onCommit={() => void commit()}
+        placeholder="RIR"
+        suffix="rir"
+        step={1}
+        min={0}
+        max={5}
+        ariaLabel="RIR"
+      />
 
       <button
         type="button"
         onClick={onDelete}
         disabled={!existing || !onDelete}
-        className="tap text-slate-500 disabled:text-slate-700 px-2"
+        className="tap text-ink-500 disabled:text-ink-700 px-2"
         aria-label="Delete set"
       >
-        ✕
+        <Icon name="trash" size={16} />
       </button>
     </div>
   );

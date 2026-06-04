@@ -177,6 +177,14 @@ export const DAY_TEMPLATES: Omit<DayTemplate, 'id'>[] = [
   },
 ];
 
+/**
+ * Exercises typically performed at bodyweight only (no external load).
+ * The set logger will hide the weight input and auto-fill weight = latest bodyweight.
+ */
+export const BODYWEIGHT_ONLY_SLUGS: ReadonlySet<string> = new Set([
+  'hanging-leg-raise',
+]);
+
 export const SIX_RULES = [
   'Log every set; beat last session by +1 rep or +2.5 kg (progressive overload).',
   'Train at 0–2 RIR; only the last set of an exercise nears true failure.',

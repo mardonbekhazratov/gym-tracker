@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { db, type Exercise, type Session } from '../db/db';
 import {
+  latestBodyWeight,
   markSessionCompleted,
   setsForSession,
   setSessionSwap,
@@ -9,6 +10,8 @@ import {
 } from '../db/queries';
 import { ExerciseCard } from '../components/ExerciseCard';
 import { ExerciseSwapSheet } from '../components/ExerciseSwapSheet';
+import { Icon } from '../components/Icon';
+import { TextArea } from '../components/ui/TextArea';
 import { useStore } from '../store/useStore';
 import { formatDateLong } from '../lib/dates';
 
@@ -22,6 +25,7 @@ export function SessionDetailScreen() {
   const [notes, setNotes] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null);
+  const [bodyweightKg, setBodyweightKg] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -30,6 +34,7 @@ export function SessionDetailScreen() {
     const tmpl = await db.dayTemplates.where('key').equals(s.dayKey).first();
     const sets = await setsForSession(sessionId);
     const allEx = await db.exercises.toArray();
+    const bw = await latestBodyWeight();
     const bySlug = new Map(allEx.map((e) => [e.slug, e]));
     const templateSlugs = tmpl?.exerciseSlugs ?? [];
     const loggedOnly = Array.from(new Set(sets.map((x) => x.exerciseSlug))).filter(
@@ -42,6 +47,7 @@ export function SessionDetailScreen() {
     setExercises(ordered);
     setLabel(tmpl?.label ?? s.dayKey);
     setNotes(s.notes ?? '');
+    setBodyweightKg(bw?.weightKg ?? null);
     if (!expanded && ordered.length > 0) setExpanded(ordered[0].slug);
   }, [sessionId, expanded]);
 
@@ -76,40 +82,45 @@ export function SessionDetailScreen() {
 
   if (!session) {
     return (
-      <div className="px-4 pt-5 pb-4">
-        <Link to="/history" className="text-sm text-brand-500">
-          ← Back
+      <div className="px-4 pt-4 pb-6 max-w-xl mx-auto">
+        <Link
+          to="/history"
+          className="tap inline-flex items-center gap-1.5 text-sm text-ember-400"
+        >
+          <Icon name="arrow-left" size={16} />
+          Back
         </Link>
-        <p className="text-slate-400 text-sm mt-3">Session not found.</p>
+        <p className="text-ink-400 text-sm mt-4">Session not found.</p>
       </div>
     );
   }
 
   return (
-    <div className="px-4 pt-5 pb-4 max-w-xl mx-auto space-y-3">
-      <Link to="/history" className="text-sm text-brand-500">
-        ← Back to history
+    <div className="px-4 pt-4 pb-6 max-w-xl mx-auto space-y-4">
+      <Link
+        to="/history"
+        className="tap inline-flex items-center gap-1.5 text-sm text-ember-400 font-medium"
+      >
+        <Icon name="arrow-left" size={16} />
+        Back to history
       </Link>
 
       <header>
-        <p className="text-xs uppercase tracking-wider text-slate-500">
-          {formatDateLong(session.date)}
-        </p>
-        <h1 className="text-2xl font-bold mt-0.5">{label}</h1>
+        <p className="label-eyebrow num">{formatDateLong(session.date)}</p>
+        <h1 className="display text-[36px] leading-[1.05] mt-1.5 text-ink-50">
+          {label}
+        </h1>
       </header>
 
-      <section className="card p-3 space-y-1">
-        <label className="block">
-          <span className="text-xs text-slate-400">Notes</span>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onBlur={handleNotesBlur}
-            rows={2}
-            className="input mt-1 text-left text-base font-normal"
-            placeholder="How did it feel?"
-          />
-        </label>
+      <section className="card p-3">
+        <TextArea
+          eyebrow="Notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={handleNotesBlur}
+          rows={2}
+          placeholder="How did it feel?"
+        />
       </section>
 
       <div className="space-y-3">
@@ -118,12 +129,14 @@ export function SessionDetailScreen() {
             key={ex.slug}
             exercise={ex}
             sessionId={sessionId}
+            sessionDate={session.date}
             units={units}
             expanded={expanded === ex.slug}
             onToggle={() => setExpanded(expanded === ex.slug ? null : ex.slug)}
             triggerRest={false}
             swappedTo={session.swaps?.[ex.slug] ?? null}
             onOpenSwap={() => setSwapTarget(ex)}
+            bodyweightKg={bodyweightKg}
           />
         ))}
       </div>
@@ -131,13 +144,21 @@ export function SessionDetailScreen() {
       <button
         type="button"
         onClick={handleToggleCompleted}
-        className={`w-full mt-3 ${
+        className={`w-full py-3.5 text-base ${
           session.completed ? 'btn-ghost' : 'btn-primary'
-        } py-3 text-base`}
+        }`}
       >
-        {session.completed
-          ? '✓ Marked done — tap to reopen'
-          : 'Mark session done'}
+        {session.completed ? (
+          <>
+            <Icon name="check" size={18} />
+            Marked done — tap to reopen
+          </>
+        ) : (
+          <>
+            <Icon name="sparkle" size={18} />
+            Mark session done
+          </>
+        )}
       </button>
 
       {swapTarget && (

@@ -3,6 +3,7 @@ import { db, type Exercise } from '../db/db';
 import { ExerciseProgressChart } from '../components/ExerciseProgressChart';
 import { BodyWeightChart } from '../components/BodyWeightChart';
 import { WeeklyVolume } from '../components/WeeklyVolume';
+import { Select } from '../components/ui/Select';
 import { useStore } from '../store/useStore';
 
 export function ProgressScreen() {
@@ -22,26 +23,30 @@ export function ProgressScreen() {
   const selected = exercises.find((e) => e.slug === selectedSlug);
 
   return (
-    <div className="px-4 pt-5 pb-4 space-y-4 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold">Progress</h1>
+    <div className="px-4 pt-4 pb-6 space-y-4 max-w-xl mx-auto">
+      <header>
+        <p className="label-eyebrow flex items-center gap-1.5">
+          <span className="inline-block w-1 h-1 rounded-full bg-ember-500" />
+          Trajectory
+        </p>
+        <h1 className="display text-[40px] leading-[1.05] mt-1.5 text-ink-50">
+          Progress
+        </h1>
+      </header>
 
       <WeeklyVolume />
 
-      <section className="card p-3 space-y-2">
-        <label className="block">
-          <span className="text-xs text-slate-400">Exercise</span>
-          <select
-            value={selectedSlug}
-            onChange={(e) => setSelectedSlug(e.target.value)}
-            className="input mt-1 text-left"
-          >
-            {exercises.map((ex) => (
-              <option key={ex.slug} value={ex.slug}>
-                {ex.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      <section className="card p-3">
+        <Select
+          value={selectedSlug}
+          eyebrow="Exercise"
+          sheetTitle="Choose exercise"
+          options={exercises.map((ex) => ({
+            value: ex.slug,
+            label: ex.name,
+          }))}
+          onChange={setSelectedSlug}
+        />
       </section>
 
       {selected && (

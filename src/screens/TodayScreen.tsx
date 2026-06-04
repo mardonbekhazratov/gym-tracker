@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { db, type DayKey, type DayTemplate, type Exercise, type Session, type Settings } from '../db/db';
 import {
   getOrCreateSessionForToday,
+  latestBodyWeight,
   markSessionCompleted,
   setSessionSwap,
 } from '../db/queries';
@@ -9,6 +10,8 @@ import { ExerciseCard } from '../components/ExerciseCard';
 import { ExerciseSwapSheet } from '../components/ExerciseSwapSheet';
 import { DeloadBanner } from '../components/DeloadBanner';
 import { ProteinBadge } from '../components/ProteinBadge';
+import { Icon } from '../components/Icon';
+import { DatePicker } from '../components/ui/DatePicker';
 import { useStore } from '../store/useStore';
 import { dayKeyForDate, formatDateLong, todayISO, weeksBetween } from '../lib/dates';
 
@@ -18,22 +21,31 @@ const DAYS: { key: DayKey; short: string }[] = [
   { key: 'friday', short: 'Fri' },
 ];
 
+/** Split "Wednesday — Lower" → { weekday: "Wednesday", focus: "Lower" }. */
+function splitTemplateLabel(label: string): { weekday: string; focus: string } {
+  const m = label.match(/^(.+?)\s*[—–-]\s*(.+)$/);
+  if (m) return { weekday: m[1].trim(), focus: m[2].trim() };
+  return { weekday: '', focus: label };
+}
+
 export function TodayScreen() {
   const selectedDay = useStore((s) => s.selectedDay);
   const setSelectedDay = useStore((s) => s.setSelectedDay);
   const expandedExerciseSlug = useStore((s) => s.expandedExerciseSlug);
   const setExpandedExerciseSlug = useStore((s) => s.setExpandedExerciseSlug);
   const units = useStore((s) => s.units);
+  const [logDate, setLogDate] = useState<string>(todayISO());
   const [template, setTemplate] = useState<DayTemplate | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [session, setSession] = useState<Session | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [bodyweightKg, setBodyweightKg] = useState<number | null>(null);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null);
 
   const today = todayISO();
   const todayKey = useMemo(() => dayKeyForDate(), []);
-  const isToday = todayKey === selectedDay;
+  const isToday = logDate === today;
 
   const weeksSinceDeload = settings
     ? weeksBetween(settings.lastDeloadDate ?? settings.programStartDate, today)
@@ -47,40 +59,52 @@ export function TodayScreen() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      setLoading(true);
-      const s = await db.settings.get(1);
+      const [s, tmpl, allEx, bw] = await Promise.all([
+        db.settings.get(1),
+        db.dayTemplates.where('key').equals(selectedDay).first(),
+        db.exercises.toArray(),
+        latestBodyWeight(),
+      ]);
+      if (cancelled) return;
       if (s) setSettings(s);
-      const tmpl = await db.dayTemplates.where('key').equals(selectedDay).first();
+      setBodyweightKg(bw?.weightKg ?? null);
+
       if (!tmpl) {
         setTemplate(null);
         setExercises([]);
-        setLoading(false);
+        setSession(null);
+        setInitialLoad(false);
         return;
       }
 
-      const allEx = await db.exercises.toArray();
       const bySlug = new Map(allEx.map((e) => [e.slug, e]));
       const ordered = tmpl.exerciseSlugs
         .map((slug) => bySlug.get(slug))
         .filter((e): e is Exercise => !!e);
 
-      const sess = await getOrCreateSessionForToday(selectedDay, today);
-
+      const sess = await getOrCreateSessionForToday(selectedDay, logDate);
       if (cancelled) return;
+
       setTemplate(tmpl);
       setExercises(ordered);
       setSession(sess);
-      if (!expandedExerciseSlug && ordered.length > 0) {
-        setExpandedExerciseSlug(ordered[0].slug);
+
+      // Keep expanded card valid for the new template.
+      const orderedSlugs = ordered.map((e) => e.slug);
+      if (
+        !expandedExerciseSlug ||
+        !orderedSlugs.includes(expandedExerciseSlug)
+      ) {
+        setExpandedExerciseSlug(ordered[0]?.slug ?? null);
       }
-      setLoading(false);
+      setInitialLoad(false);
     }
     void load();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDay, today]);
+  }, [selectedDay, logDate]);
 
   async function handleFinish() {
     if (!session?.id) return;
@@ -106,18 +130,46 @@ export function TodayScreen() {
     if (updated) setSession(updated);
   }
 
+  const { weekday, focus } = template
+    ? splitTemplateLabel(template.label)
+    : { weekday: '', focus: 'Pick a day' };
+
   return (
-    <div className="px-4 pt-5 pb-4 max-w-xl mx-auto">
-      <header className="mb-3">
-        <p className="text-xs uppercase tracking-wider text-slate-500">
-          {isToday ? 'Today' : 'Planned'} · {formatDateLong(today)}
-        </p>
-        <h1 className="text-2xl font-bold mt-0.5">
-          {template?.label ?? 'Pick a day'}
+    <div className="px-4 pt-4 pb-6 max-w-xl mx-auto">
+      <header className="mb-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="label-eyebrow flex items-center gap-1.5">
+            <span className="inline-block w-1 h-1 rounded-full bg-ember-500" />
+            {isToday ? 'Today' : 'Logging'} · {weekday || formatDateLong(logDate)}
+          </p>
+          {!isToday && (
+            <button
+              type="button"
+              onClick={() => setLogDate(today)}
+              className="tap text-[10px] uppercase tracking-[0.18em] font-semibold text-ember-400 px-2 py-1 rounded-md border border-ember-500/30 bg-ember-500/5"
+            >
+              Back to today
+            </button>
+          )}
+        </div>
+        <h1
+          key={focus}
+          className="display text-[36px] sm:text-[40px] leading-[1.05] mt-1.5 text-ink-50
+            min-h-[2.2em] animate-[titleIn_320ms_cubic-bezier(0.32,0.72,0,1)]"
+        >
+          {focus}
         </h1>
+        <div className="mt-2">
+          <DatePicker
+            value={logDate}
+            onChange={setLogDate}
+            eyebrow="Log date"
+            max={today}
+          />
+        </div>
       </header>
 
-      <div className="space-y-2 mb-3">
+      <div className="space-y-2 mb-4">
         <DeloadBanner
           weeksSince={weeksSinceDeload}
           onMarkDone={handleMarkDeloadDone}
@@ -125,7 +177,7 @@ export function TodayScreen() {
         <ProteinBadge grams={proteinGrams} />
       </div>
 
-      <div role="tablist" className="grid grid-cols-3 gap-2 mb-4">
+      <div role="tablist" className="grid grid-cols-3 gap-2 mb-5">
         {DAYS.map((d) => {
           const active = d.key === selectedDay;
           const isTodayBadge = d.key === todayKey;
@@ -135,34 +187,44 @@ export function TodayScreen() {
               role="tab"
               aria-selected={active}
               onClick={() => setSelectedDay(d.key)}
-              className={`tap relative rounded-xl py-2 text-sm font-semibold border ${
-                active
-                  ? 'bg-brand-500 text-white border-brand-500'
-                  : 'bg-slate-900 text-slate-200 border-slate-800'
-              }`}
+              className={`tap relative rounded-xl py-2.5 text-sm font-semibold border tracking-wide
+                transition-[background-color,border-color,box-shadow,color] duration-200
+                ${
+                  active
+                    ? 'bg-ember-500 text-white border-ember-500 shadow-glow'
+                    : 'bg-ink-900/60 text-ink-200 border-ink-800 active:bg-ink-800/60'
+                }`}
             >
               {d.short}
               {isTodayBadge && !active && (
-                <span className="absolute top-1 right-2 text-[9px] text-emerald-400">
-                  •
-                </span>
+                <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
               )}
             </button>
           );
         })}
       </div>
 
-      {loading && (
-        <p className="text-slate-400 text-sm">Loading…</p>
+      {initialLoad && (
+        <p className="text-ink-400 text-sm">Loading…</p>
       )}
 
-      {!loading && template && session && (
-        <div className="space-y-3">
+      {!initialLoad && !template && (
+        <p className="text-ink-400 text-sm">
+          No template for this day. Pick Mon, Wed, or Fri.
+        </p>
+      )}
+
+      {template && session && (
+        <div
+          key={`${selectedDay}-${session.id}`}
+          className="space-y-3 animate-[fadeSlide_280ms_cubic-bezier(0.32,0.72,0,1)]"
+        >
           {exercises.map((ex) => (
             <ExerciseCard
               key={ex.slug}
               exercise={ex}
               sessionId={session.id!}
+              sessionDate={session.date}
               units={units}
               expanded={expandedExerciseSlug === ex.slug}
               onToggle={() =>
@@ -172,25 +234,30 @@ export function TodayScreen() {
               }
               swappedTo={session.swaps?.[ex.slug] ?? null}
               onOpenSwap={() => setSwapTarget(ex)}
+              bodyweightKg={bodyweightKg}
             />
           ))}
 
           <button
             type="button"
             onClick={handleFinish}
-            className={`w-full mt-3 ${
+            className={`w-full mt-4 py-3.5 text-base ${
               session.completed ? 'btn-ghost' : 'btn-primary'
-            } py-3 text-base`}
+            }`}
           >
-            {session.completed ? '✓ Session finished — tap to reopen' : 'Finish session'}
+            {session.completed ? (
+              <>
+                <Icon name="check" size={18} />
+                Session finished — tap to reopen
+              </>
+            ) : (
+              <>
+                <Icon name="sparkle" size={18} />
+                Finish session
+              </>
+            )}
           </button>
         </div>
-      )}
-
-      {!loading && !template && (
-        <p className="text-slate-400 text-sm">
-          No template for this day. Pick Mon, Wed, or Fri.
-        </p>
       )}
 
       {swapTarget && (
@@ -201,6 +268,17 @@ export function TodayScreen() {
           onSelect={handleSelectSwap}
         />
       )}
+
+      <style>{`
+        @keyframes titleIn {
+          from { opacity: 0; transform: translateY(6px); filter: blur(2px); }
+          to   { opacity: 1; transform: translateY(0);  filter: blur(0); }
+        }
+        @keyframes fadeSlide {
+          from { opacity: 0; transform: translateY(4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
