@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import { Icon } from '../Icon';
+import { useOverlay } from '../../lib/overlayStack';
 
 interface ConfirmOptions {
   title: string;
@@ -29,6 +30,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     pending.resolve(v);
     setPending(null);
   }
+
+  // Android back button dismisses the dialog as a cancel.
+  useOverlay(pending !== null, () => resolveAndClose(false));
 
   return (
     <ConfirmContext.Provider value={confirm}>

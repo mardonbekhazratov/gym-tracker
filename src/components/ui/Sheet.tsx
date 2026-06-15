@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { useOverlay } from '../../lib/overlayStack';
 
 interface SheetProps {
   open: boolean;
@@ -18,6 +19,9 @@ export function Sheet({
   children,
   maxHeightClass = 'max-h-[85vh]',
 }: SheetProps) {
+  // Let the Android back button close this sheet before any routing happens.
+  useOverlay(open, onClose);
+
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
