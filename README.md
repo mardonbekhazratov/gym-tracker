@@ -1,6 +1,6 @@
 # Workout Tracker
 
-An **offline-first, single-user** gym tracker for a fixed 3-day upper-body-focused split (Mon / Wed / Fri). Built as a PWA and wrapped to an Android APK with Capacitor. Targets a Samsung Galaxy S24 Ultra in portrait.
+An **offline-first, single-user** gym tracker for a fixed 3-day upper-body-focused split (Tue / Thu / Sat). Built as a PWA and wrapped to an Android APK with Capacitor. Targets a Samsung Galaxy S24 Ultra in portrait.
 
 - No accounts, no servers, no network required.
 - All data lives on-device in IndexedDB (Dexie).
@@ -37,7 +37,7 @@ npm run build        # produces dist/ (PWA + Capacitor source)
 npm run preview      # serve the built dist/
 ```
 
-Open the app on http://localhost:5173 (or your LAN IP shown by Vite) — on first launch the program seeds itself (19 exercises, 3 day templates, default settings: kg, protein 1.8 g/kg).
+Open the app on http://localhost:5173 (or your LAN IP shown by Vite) — on first launch the program seeds itself (17 exercises, 3 day templates, default settings: kg, protein 1.8 g/kg).
 
 ---
 
@@ -45,7 +45,7 @@ Open the app on http://localhost:5173 (or your LAN IP shown by Vite) — on firs
 
 ### Today screen — log a workout
 
-1. **Pick a day.** It auto-selects Mon / Wed / Fri based on the date; tap a different tab to plan ahead.
+1. **Pick a day.** It auto-selects Tue / Thu / Sat based on the date; tap a different tab to plan ahead.
 2. **Glance at the top.**
    - **Deload banner** appears once it's been ≥6 weeks since your last deload (or program start). Tap _Mark done_ when you finish your deload week.
    - **Protein badge** shows your daily target (`bodyweight × protein g/kg`). If empty, it links to Settings.
@@ -54,7 +54,8 @@ Open the app on http://localhost:5173 (or your LAN IP shown by Vite) — on firs
 5. **Rest timer.** Auto-starts on every save from `exercise.restSeconds`. Use _+30s_ or _Skip_. It floats above the bottom nav.
 6. **Need a substitute?** Tap the ⇄ icon on an exercise to open the swap sheet. Pick from the program's listed alternatives — the swap only applies to the current session and is persisted (no template mutation). Set logs stay under the original exercise so progress charts remain continuous.
 7. **Add an extra set** with the _+ Add set_ button. Delete a logged set with the ✕ at the end of its row.
-8. **Finish session** at the bottom marks it complete. Tap again to reopen.
+8. **Add or reorder exercises** for this session — _+ Add exercise_ pulls from the library or creates a new one; _Reorder_ rearranges the session's exercises.
+9. **Finish session** at the bottom marks it complete. Tap again to reopen.
 
 ### History screen
 
