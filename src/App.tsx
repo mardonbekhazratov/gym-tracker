@@ -10,9 +10,12 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { db } from './db/db';
 import { useStore } from './store/useStore';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
+import { useAndroidBackButton } from './lib/useAndroidBackButton';
 
 export default function App() {
   const setUnits = useStore((s) => s.setUnits);
+
+  useAndroidBackButton();
 
   useEffect(() => {
     void db.settings.get(1).then((s) => {

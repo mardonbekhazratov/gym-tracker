@@ -7,7 +7,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      // We register the service worker ourselves (web only) in main.tsx so it is
+      // never active inside the Capacitor WebView — a stale precache there makes
+      // the app run an old JS bundle that no longer matches the installed APK.
+      injectRegister: false,
       includeAssets: ['icon-192.png', 'icon-512.png', 'maskable-512.png'],
       manifest: {
         name: 'Workout Tracker',
