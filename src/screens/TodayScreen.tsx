@@ -5,9 +5,13 @@ import {
   latestBodyWeight,
   markSessionCompleted,
   setSessionSwap,
+  setSessionExerciseOrder,
+  createExercise,
+  type NewExerciseInput,
 } from '../db/queries';
 import { ExerciseCard } from '../components/ExerciseCard';
 import { ExerciseSwapSheet } from '../components/ExerciseSwapSheet';
+import { AddExerciseSheet } from '../components/AddExerciseSheet';
 import { DeloadBanner } from '../components/DeloadBanner';
 import { ProteinBadge } from '../components/ProteinBadge';
 import { Icon } from '../components/Icon';
@@ -16,9 +20,9 @@ import { useStore } from '../store/useStore';
 import { dayKeyForDate, formatDateLong, todayISO, weeksBetween } from '../lib/dates';
 
 const DAYS: { key: DayKey; short: string }[] = [
-  { key: 'monday', short: 'Mon' },
-  { key: 'wednesday', short: 'Wed' },
-  { key: 'friday', short: 'Fri' },
+  { key: 'tuesday', short: 'Tue' },
+  { key: 'thursday', short: 'Thu' },
+  { key: 'saturday', short: 'Sat' },
 ];
 
 /** Split "Wednesday — Lower" → { weekday: "Wednesday", focus: "Lower" }. */
@@ -36,12 +40,24 @@ export function TodayScreen() {
   const units = useStore((s) => s.units);
   const [logDate, setLogDate] = useState<string>(todayISO());
   const [template, setTemplate] = useState<DayTemplate | null>(null);
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [allExercises, setAllExercises] = useState<Exercise[]>([]);
+  const [order, setOrder] = useState<string[]>([]);
   const [session, setSession] = useState<Session | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [bodyweightKg, setBodyweightKg] = useState<number | null>(null);
   const [initialLoad, setInitialLoad] = useState(true);
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null);
+  const [reordering, setReordering] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const bySlug = useMemo(
+    () => new Map(allExercises.map((e) => [e.slug, e])),
+    [allExercises],
+  );
+  const exercises = useMemo(
+    () => order.map((s) => bySlug.get(s)).filter((e): e is Exercise => !!e),
+    [order, bySlug],
+  );
 
   const today = todayISO();
   const todayKey = useMemo(() => dayKeyForDate(), []);
@@ -69,33 +85,37 @@ export function TodayScreen() {
       if (s) setSettings(s);
       setBodyweightKg(bw?.weightKg ?? null);
 
+      setAllExercises(allEx);
+      setReordering(false);
+
       if (!tmpl) {
         setTemplate(null);
-        setExercises([]);
+        setOrder([]);
         setSession(null);
         setInitialLoad(false);
         return;
       }
 
-      const bySlug = new Map(allEx.map((e) => [e.slug, e]));
-      const ordered = tmpl.exerciseSlugs
-        .map((slug) => bySlug.get(slug))
-        .filter((e): e is Exercise => !!e);
-
+      const exBySlug = new Map(allEx.map((e) => [e.slug, e]));
       const sess = await getOrCreateSessionForToday(selectedDay, logDate);
       if (cancelled) return;
 
+      // Per-session order (reordered/added exercises) overrides the template,
+      // filtered to slugs that still resolve to a known exercise.
+      const orderedSlugs = (sess.exerciseOrder ?? tmpl.exerciseSlugs).filter(
+        (slug) => exBySlug.has(slug),
+      );
+
       setTemplate(tmpl);
-      setExercises(ordered);
+      setOrder(orderedSlugs);
       setSession(sess);
 
-      // Keep expanded card valid for the new template.
-      const orderedSlugs = ordered.map((e) => e.slug);
+      // Keep expanded card valid for the new day.
       if (
         !expandedExerciseSlug ||
         !orderedSlugs.includes(expandedExerciseSlug)
       ) {
-        setExpandedExerciseSlug(ordered[0]?.slug ?? null);
+        setExpandedExerciseSlug(orderedSlugs[0] ?? null);
       }
       setInitialLoad(false);
     }
@@ -128,6 +148,36 @@ export function TodayScreen() {
       alternative,
     );
     if (updated) setSession(updated);
+  }
+
+  async function applyOrder(next: string[]) {
+    if (!session?.id) return;
+    setOrder(next);
+    const updated = await setSessionExerciseOrder(session.id, next);
+    if (updated) setSession(updated);
+  }
+
+  function moveExercise(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= order.length) return;
+    const next = order.slice();
+    [next[index], next[target]] = [next[target], next[index]];
+    void applyOrder(next);
+  }
+
+  async function handleAddExisting(slug: string) {
+    setAddOpen(false);
+    if (order.includes(slug)) return;
+    await applyOrder([...order, slug]);
+    setExpandedExerciseSlug(slug);
+  }
+
+  async function handleCreateExercise(input: NewExerciseInput) {
+    setAddOpen(false);
+    const created = await createExercise(input);
+    setAllExercises((prev) => [...prev, created]);
+    await applyOrder([...order, created.slug]);
+    setExpandedExerciseSlug(created.slug);
   }
 
   const { weekday, focus } = template
@@ -210,7 +260,7 @@ export function TodayScreen() {
 
       {!initialLoad && !template && (
         <p className="text-ink-400 text-sm">
-          No template for this day. Pick Mon, Wed, or Fri.
+          No template for this day. Pick Tue, Thu, or Sat.
         </p>
       )}
 
@@ -219,25 +269,90 @@ export function TodayScreen() {
           key={`${selectedDay}-${session.id}`}
           className="space-y-3 animate-[fadeSlide_280ms_cubic-bezier(0.32,0.72,0,1)]"
         >
-          {exercises.map((ex) => (
-            <ExerciseCard
-              key={ex.slug}
-              exercise={ex}
-              sessionId={session.id!}
-              sessionDate={session.date}
-              units={units}
-              expanded={expandedExerciseSlug === ex.slug}
-              onToggle={() =>
-                setExpandedExerciseSlug(
-                  expandedExerciseSlug === ex.slug ? null : ex.slug,
-                )
-              }
-              swappedTo={session.swaps?.[ex.slug] ?? null}
-              onOpenSwap={() => setSwapTarget(ex)}
-              bodyweightKg={bodyweightKg}
-            />
-          ))}
+          {exercises.length > 1 && (
+            <div className="flex items-center justify-between -mb-1">
+              <p className="label-eyebrow num">{exercises.length} exercises</p>
+              <button
+                type="button"
+                onClick={() => setReordering((r) => !r)}
+                className={`tap text-[10px] uppercase tracking-[0.18em] font-semibold
+                  px-2.5 py-1 rounded-md border inline-flex items-center gap-1.5
+                  ${
+                    reordering
+                      ? 'text-white bg-ember-500 border-ember-500'
+                      : 'text-ink-300 border-ink-700 bg-ink-900/60'
+                  }`}
+              >
+                <Icon name={reordering ? 'check' : 'swap'} size={13} />
+                {reordering ? 'Done' : 'Reorder'}
+              </button>
+            </div>
+          )}
 
+          {reordering
+            ? exercises.map((ex, i) => (
+                <div
+                  key={ex.slug}
+                  className="card flex items-center justify-between px-4 py-3"
+                >
+                  <span className="font-semibold text-ink-50 truncate text-[15px] min-w-0">
+                    {session.swaps?.[ex.slug] ?? ex.name}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <button
+                      type="button"
+                      onClick={() => moveExercise(i, -1)}
+                      disabled={i === 0}
+                      aria-label="Move up"
+                      className="tap w-9 h-9 grid place-items-center rounded-lg
+                        bg-ink-800/70 text-ink-200 disabled:opacity-30"
+                    >
+                      <Icon name="chevron-down" size={18} className="rotate-180" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveExercise(i, 1)}
+                      disabled={i === exercises.length - 1}
+                      aria-label="Move down"
+                      className="tap w-9 h-9 grid place-items-center rounded-lg
+                        bg-ink-800/70 text-ink-200 disabled:opacity-30"
+                    >
+                      <Icon name="chevron-down" size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            : exercises.map((ex) => (
+                <ExerciseCard
+                  key={ex.slug}
+                  exercise={ex}
+                  sessionId={session.id!}
+                  sessionDate={session.date}
+                  units={units}
+                  expanded={expandedExerciseSlug === ex.slug}
+                  onToggle={() =>
+                    setExpandedExerciseSlug(
+                      expandedExerciseSlug === ex.slug ? null : ex.slug,
+                    )
+                  }
+                  swappedTo={session.swaps?.[ex.slug] ?? null}
+                  onOpenSwap={() => setSwapTarget(ex)}
+                  bodyweightKg={bodyweightKg}
+                />
+              ))}
+
+          {!reordering && (
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="btn-ghost w-full"
+            >
+              <Icon name="plus" size={16} />
+              Add exercise
+            </button>
+          )}
+
+          {!reordering && (
           <button
             type="button"
             onClick={handleFinish}
@@ -257,6 +372,7 @@ export function TodayScreen() {
               </>
             )}
           </button>
+          )}
         </div>
       )}
 
@@ -266,6 +382,16 @@ export function TodayScreen() {
           current={session?.swaps?.[swapTarget.slug] ?? null}
           onClose={() => setSwapTarget(null)}
           onSelect={handleSelectSwap}
+        />
+      )}
+
+      {addOpen && session && (
+        <AddExerciseSheet
+          library={allExercises}
+          existingSlugs={order}
+          onClose={() => setAddOpen(false)}
+          onAddExisting={handleAddExisting}
+          onCreate={handleCreateExercise}
         />
       )}
 

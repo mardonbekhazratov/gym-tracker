@@ -24,7 +24,7 @@ interface UIState {
   clearRest: () => void;
 }
 
-const initialDay: DayKey = dayKeyForDate() ?? 'monday';
+const initialDay: DayKey = dayKeyForDate() ?? 'tuesday';
 
 export const useStore = create<UIState>((set, get) => ({
   selectedDay: initialDay,

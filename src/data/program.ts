@@ -23,7 +23,7 @@ const ex = (
 });
 
 export const EXERCISES: SeedExercise[] = [
-  // Monday — Upper (Push focus)
+  // Tuesday — Upper (Push focus)
   ex('incline-db-press', 'Incline dumbbell press', 'chest', 3, 6, 10, 150, [
     'Incline barbell press',
     'Incline machine press',
@@ -57,7 +57,7 @@ export const EXERCISES: SeedExercise[] = [
     'Dips (triceps)',
   ]),
 
-  // Wednesday — Lower
+  // Thursday — Lower
   ex('back-squat', 'Back squat', 'quads', 3, 6, 10, 180, [
     'Front squat',
     'Hack squat',
@@ -93,7 +93,7 @@ export const EXERCISES: SeedExercise[] = [
     'Ab wheel rollout',
   ]),
 
-  // Friday — Upper (Pull focus + arms)
+  // Saturday — Upper (Pull focus + arms)
   ex('weighted-pull-ups', 'Weighted pull-ups', 'back', 3, 6, 10, 150, [
     'Lat pulldown (heavy)',
     'Neutral-grip pull-up',
@@ -112,22 +112,13 @@ export const EXERCISES: SeedExercise[] = [
     'Chest-supported row (heavy)',
     'Yates row',
   ]),
-  ex('incline-db-press-f', 'Incline dumbbell press', 'chest', 3, 8, 12, 120, [
-    'Incline barbell press',
-    'Machine incline press',
-    'Low-incline DB press',
-  ]),
+  // (Incline dumbbell press & lateral raises are shared with the push day.)
   ex('dumbbell-curl', 'Dumbbell curl', 'biceps', 3, 8, 12, 90, [
     'Barbell curl',
     'EZ-bar curl',
     'Incline DB curl',
     'Hammer curl',
     'Preacher curl',
-  ]),
-  ex('db-lateral-raise-f', 'Lateral raises (dumbbell)', 'sideDelts', 3, 12, 15, 75, [
-    'Cable lateral raise',
-    'Machine lateral raise',
-    'Leaning DB lateral raise',
   ]),
   ex('rear-delt-flye', 'Rear delt flye (cable)', 'rearDelts', 3, 12, 15, 75, [
     'Reverse pec deck',
@@ -139,8 +130,8 @@ export const EXERCISES: SeedExercise[] = [
 
 export const DAY_TEMPLATES: Omit<DayTemplate, 'id'>[] = [
   {
-    key: 'monday',
-    label: 'Monday — Upper (Push focus)',
+    key: 'tuesday',
+    label: 'Tuesday — Upper (Push focus)',
     exerciseSlugs: [
       'incline-db-press',
       'flat-bench-press',
@@ -151,8 +142,8 @@ export const DAY_TEMPLATES: Omit<DayTemplate, 'id'>[] = [
     ],
   },
   {
-    key: 'wednesday',
-    label: 'Wednesday — Lower',
+    key: 'thursday',
+    label: 'Thursday — Lower',
     exerciseSlugs: [
       'back-squat',
       'romanian-deadlift',
@@ -163,19 +154,29 @@ export const DAY_TEMPLATES: Omit<DayTemplate, 'id'>[] = [
     ],
   },
   {
-    key: 'friday',
-    label: 'Friday — Upper (Pull focus + arms)',
+    key: 'saturday',
+    label: 'Saturday — Upper (Pull focus + arms)',
     exerciseSlugs: [
       'weighted-pull-ups',
       'overhead-press',
       'barbell-row',
-      'incline-db-press-f',
+      'incline-db-press',
       'dumbbell-curl',
-      'db-lateral-raise-f',
+      'db-lateral-raise',
       'rear-delt-flye',
     ],
   },
 ];
+
+/**
+ * Legacy duplicate slugs that were merged into a single tracked exercise,
+ * mapped to the surviving slug. Used by the one-time data migration to remap
+ * existing set logs / swaps and to fix old day templates.
+ */
+export const MERGED_EXERCISE_SLUGS: Record<string, string> = {
+  'incline-db-press-f': 'incline-db-press',
+  'db-lateral-raise-f': 'db-lateral-raise',
+};
 
 /**
  * Exercises typically performed at bodyweight only (no external load).

@@ -9,12 +9,12 @@ export function todayISO(d: Date = new Date()): string {
 
 export function dayKeyForDate(d: Date = new Date()): DayKey | null {
   switch (d.getDay()) {
-    case 1:
-      return 'monday';
-    case 3:
-      return 'wednesday';
-    case 5:
-      return 'friday';
+    case 2:
+      return 'tuesday';
+    case 4:
+      return 'thursday';
+    case 6:
+      return 'saturday';
     default:
       return null;
   }
