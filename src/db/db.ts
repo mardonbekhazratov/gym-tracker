@@ -13,7 +13,12 @@ export type MuscleGroup =
   | 'abs'
   | 'shoulders';
 
-export type DayKey = 'monday' | 'wednesday' | 'friday';
+/** Days the program is actively trained on. */
+export type DayKey = 'tuesday' | 'thursday' | 'saturday';
+/** Old day keys kept only so previously-logged sessions stay labeled. */
+export type LegacyDayKey = 'monday' | 'wednesday' | 'friday';
+/** Any day key that may appear in stored records (active or legacy). */
+export type AnyDayKey = DayKey | LegacyDayKey;
 
 export interface Exercise {
   id?: number;
@@ -25,11 +30,13 @@ export interface Exercise {
   repHigh: number;
   restSeconds: number;
   alternatives: string[];
+  /** True for exercises the user created in-app (not part of the seed). */
+  custom?: boolean;
 }
 
 export interface DayTemplate {
   id?: number;
-  key: DayKey;
+  key: AnyDayKey;
   label: string;
   exerciseSlugs: string[];
 }
@@ -37,11 +44,17 @@ export interface DayTemplate {
 export interface Session {
   id?: number;
   date: string;
-  dayKey: DayKey;
+  dayKey: AnyDayKey;
   notes?: string;
   completed: boolean;
   /** per-session exercise swaps: exerciseSlug → alternative display name. */
   swaps?: Record<string, string>;
+  /**
+   * Per-session ordered exercise slugs. When set, overrides the day template's
+   * order for this session only (covers in-session reordering and added
+   * exercises). Undefined means "use the template order".
+   */
+  exerciseOrder?: string[];
 }
 
 export interface SetLog {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { db, type Exercise, type Session } from '../db/db';
 import {
@@ -26,6 +26,9 @@ export function SessionDetailScreen() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null);
   const [bodyweightKg, setBodyweightKg] = useState<number | null>(null);
+  // Auto-expand the first card only once, so collapsing a card and a later
+  // re-load() don't keep snapping the first exercise back open.
+  const didAutoExpand = useRef(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(sessionId)) return;
@@ -36,11 +39,13 @@ export function SessionDetailScreen() {
     const allEx = await db.exercises.toArray();
     const bw = await latestBodyWeight();
     const bySlug = new Map(allEx.map((e) => [e.slug, e]));
-    const templateSlugs = tmpl?.exerciseSlugs ?? [];
+    // Honour the session's saved order (reordered / added exercises), then
+    // append any logged exercises not otherwise listed.
+    const baseSlugs = s.exerciseOrder ?? tmpl?.exerciseSlugs ?? [];
     const loggedOnly = Array.from(new Set(sets.map((x) => x.exerciseSlug))).filter(
-      (slug) => !templateSlugs.includes(slug),
+      (slug) => !baseSlugs.includes(slug),
     );
-    const ordered = [...templateSlugs, ...loggedOnly]
+    const ordered = [...baseSlugs, ...loggedOnly]
       .map((slug) => bySlug.get(slug))
       .filter((e): e is Exercise => !!e);
     setSession(s);
@@ -48,8 +53,11 @@ export function SessionDetailScreen() {
     setLabel(tmpl?.label ?? s.dayKey);
     setNotes(s.notes ?? '');
     setBodyweightKg(bw?.weightKg ?? null);
-    if (!expanded && ordered.length > 0) setExpanded(ordered[0].slug);
-  }, [sessionId, expanded]);
+    if (!didAutoExpand.current && ordered.length > 0) {
+      setExpanded(ordered[0].slug);
+      didAutoExpand.current = true;
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     void load();

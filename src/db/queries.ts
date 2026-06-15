@@ -1,8 +1,16 @@
-import { db, type BodyWeight, type SetLog, type Session, type DayKey, type MuscleGroup } from './db';
+import {
+  db,
+  type BodyWeight,
+  type SetLog,
+  type Session,
+  type AnyDayKey,
+  type Exercise,
+  type MuscleGroup,
+} from './db';
 import { todayISO } from '../lib/dates';
 
 export async function getOrCreateSessionForToday(
-  dayKey: DayKey,
+  dayKey: AnyDayKey,
   date: string = todayISO(),
 ): Promise<Session> {
   const existing = await db.sessions
@@ -100,6 +108,62 @@ export async function setSessionSwap(
   else delete swaps[exerciseSlug];
   await db.sessions.update(sessionId, { swaps });
   return db.sessions.get(sessionId);
+}
+
+export async function setSessionExerciseOrder(
+  sessionId: number,
+  exerciseSlugs: string[],
+): Promise<Session | undefined> {
+  await db.sessions.update(sessionId, { exerciseOrder: exerciseSlugs });
+  return db.sessions.get(sessionId);
+}
+
+export interface NewExerciseInput {
+  name: string;
+  muscleGroup: MuscleGroup;
+  defaultSets: number;
+  repLow: number;
+  repHigh: number;
+  restSeconds: number;
+}
+
+/** Turn a display name into a URL-ish slug, e.g. "Cable Fly!" → "cable-fly". */
+function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'exercise'
+  );
+}
+
+/**
+ * Create a user-defined exercise, generating a slug unique among existing
+ * exercises. Returns the persisted row (with its id and final slug).
+ */
+export async function createExercise(input: NewExerciseInput): Promise<Exercise> {
+  const existing = await db.exercises.toArray();
+  const taken = new Set(existing.map((e) => e.slug));
+  const base = slugify(input.name);
+  let slug = base;
+  let n = 2;
+  while (taken.has(slug)) {
+    slug = `${base}-${n++}`;
+  }
+  const row: Exercise = {
+    slug,
+    name: input.name.trim(),
+    muscleGroup: input.muscleGroup,
+    defaultSets: input.defaultSets,
+    repLow: input.repLow,
+    repHigh: input.repHigh,
+    restSeconds: input.restSeconds,
+    alternatives: [],
+    custom: true,
+  };
+  const id = (await db.exercises.add(row)) as number;
+  return { ...row, id };
 }
 
 export async function recordBodyWeight(
