@@ -14,6 +14,7 @@ for (const p of ['/history', '/progress', '/settings']) {
 // Deeper routes navigate back one step (e.g. session detail -> history list).
 assert.equal(decideBackAction('/history/123'), 'back', 'session detail should go back');
 assert.equal(decideBackAction('/history/abc'), 'back', 'session detail should go back');
+assert.equal(decideBackAction('/settings/exercises'), 'back', 'exercise library should go back to settings');
 
 // Unknown / trailing-slash paths are treated as deeper routes (never surprise-exit).
 assert.equal(decideBackAction('/nope'), 'back', 'unknown path should go back');

@@ -22,6 +22,8 @@ interface Props {
   triggerRest?: boolean;
   swappedTo?: string | null;
   onOpenSwap?: () => void;
+  /** Opens the exercise editor (default sets, reps, rest…). */
+  onEdit?: () => void;
   bodyweightKg?: number | null;
 }
 
@@ -35,6 +37,7 @@ export function ExerciseCard({
   triggerRest = true,
   swappedTo,
   onOpenSwap,
+  onEdit,
   bodyweightKg,
 }: Props) {
   const [sets, setSets] = useState<SetLog[]>([]);
@@ -249,6 +252,17 @@ export function ExerciseCard({
               <Icon name="plus" size={16} />
               Add set
             </button>
+            {onEdit && (
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={onEdit}
+                aria-label="Edit exercise"
+              >
+                <Icon name="edit" size={16} />
+                Edit
+              </button>
+            )}
           </div>
         </div>
       )}

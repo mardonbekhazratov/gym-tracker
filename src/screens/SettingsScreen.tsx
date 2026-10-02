@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { db, type Settings } from '../db/db';
 import { BodyWeightInput } from '../components/BodyWeightInput';
 import { Icon } from '../components/Icon';
@@ -199,6 +200,16 @@ export function SettingsScreen() {
           onChange={(d) => void persist({ programStartDate: d })}
           eyebrow="Program start date"
         />
+        <Link
+          to="/settings/exercises"
+          className="btn-ghost w-full justify-between"
+        >
+          <span className="inline-flex items-center gap-2">
+            <Icon name="dumbbell" size={16} />
+            Manage exercises
+          </span>
+          <Icon name="chevron-right" size={16} className="text-ink-400" />
+        </Link>
       </section>
 
       <section className="card p-4 space-y-3">

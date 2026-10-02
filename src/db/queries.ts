@@ -196,6 +196,71 @@ export async function createExercise(input: NewExerciseInput): Promise<Exercise>
   return { ...row, id };
 }
 
+/** Fields of an exercise the user can edit. The slug never changes. */
+export type ExercisePatch = Partial<
+  Pick<
+    Exercise,
+    | 'name'
+    | 'muscleGroup'
+    | 'defaultSets'
+    | 'repLow'
+    | 'repHigh'
+    | 'restSeconds'
+    | 'alternatives'
+  >
+>;
+
+/**
+ * Edit an exercise's definition (name, targets, rest, alternatives). Logs
+ * reference the slug, which is left untouched, so history stays attached.
+ * Returns the updated row.
+ */
+export async function updateExercise(
+  id: number,
+  patch: ExercisePatch,
+): Promise<Exercise | undefined> {
+  await db.exercises.update(id, patch);
+  return db.exercises.get(id);
+}
+
+export async function countSetLogsForExercise(slug: string): Promise<number> {
+  return db.setLogs.where('exerciseSlug').equals(slug).count();
+}
+
+/**
+ * Delete an exercise that has never been logged, and drop it from every day
+ * template and per-session order. Refuses if any set log references it, so
+ * history can never be orphaned.
+ */
+export async function deleteExercise(slug: string): Promise<void> {
+  await db.transaction(
+    'rw',
+    [db.exercises, db.dayTemplates, db.sessions, db.setLogs],
+    async () => {
+      if ((await countSetLogsForExercise(slug)) > 0) {
+        throw new Error('This exercise has logged sets and can’t be deleted.');
+      }
+      await db.exercises.where('slug').equals(slug).delete();
+      const templates = await db.dayTemplates.toArray();
+      for (const t of templates) {
+        if (t.exerciseSlugs.includes(slug)) {
+          await db.dayTemplates.update(t.id!, {
+            exerciseSlugs: t.exerciseSlugs.filter((x) => x !== slug),
+          });
+        }
+      }
+      const sessions = await db.sessions.toArray();
+      for (const s of sessions) {
+        if (s.exerciseOrder?.includes(slug)) {
+          await db.sessions.update(s.id!, {
+            exerciseOrder: s.exerciseOrder.filter((x) => x !== slug),
+          });
+        }
+      }
+    },
+  );
+}
+
 export async function recordBodyWeight(
   date: string,
   weightKg: number,

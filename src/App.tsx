@@ -7,6 +7,7 @@ import { HistoryScreen } from './screens/HistoryScreen';
 import { SessionDetailScreen } from './screens/SessionDetailScreen';
 import { ProgressScreen } from './screens/ProgressScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { ExercisesScreen } from './screens/ExercisesScreen';
 import { db } from './db/db';
 import { autoCompleteStaleSessions } from './db/queries';
 import { useStore } from './store/useStore';
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="/history/:sessionId" element={<SessionDetailScreen />} />
             <Route path="/progress" element={<ProgressScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
+            <Route path="/settings/exercises" element={<ExercisesScreen />} />
           </Routes>
         </main>
         <RestTimer />
