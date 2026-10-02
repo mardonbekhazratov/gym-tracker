@@ -1,5 +1,7 @@
+import { Capacitor } from '@capacitor/core';
 import { db } from '../db/db';
 import { seedIfEmpty } from '../db/seed';
+import { Downloads } from './downloads';
 
 export const BACKUP_VERSION = 1;
 
@@ -46,6 +48,25 @@ export function triggerDownload(filename: string, json: string): void {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * Saves the backup JSON to the device. On the native Android app the file
+ * lands in the public Downloads folder via MediaStore; on web/PWA it falls
+ * back to a browser download (which the browser also routes to Downloads).
+ * Returns a human-readable destination for display.
+ */
+export async function saveBackup(filename: string, json: string): Promise<string> {
+  if (Capacitor.isNativePlatform()) {
+    const { path } = await Downloads.saveToDownloads({
+      filename,
+      data: json,
+      mimeType: 'application/json',
+    });
+    return path;
+  }
+  triggerDownload(filename, json);
+  return filename;
 }
 
 export async function importBackup(file: BackupFile): Promise<void> {

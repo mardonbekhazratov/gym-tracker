@@ -10,7 +10,7 @@ import { displayWeight, parseWeightToKg } from '../lib/units';
 import {
   exportBackup,
   importBackup,
-  triggerDownload,
+  saveBackup,
   type BackupFile,
 } from '../lib/backup';
 import { todayISO } from '../lib/dates';
@@ -66,12 +66,14 @@ export function SettingsScreen() {
   }
 
   async function handleExport() {
-    const backup = await exportBackup();
-    triggerDownload(
-      `workout-tracker-${todayISO()}.json`,
-      JSON.stringify(backup, null, 2),
-    );
-    setStatus(`Exported ${todayISO()}`);
+    const filename = `workout-tracker-${todayISO()}.json`;
+    try {
+      const backup = await exportBackup();
+      const dest = await saveBackup(filename, JSON.stringify(backup, null, 2));
+      setStatus(`Saved to ${dest}`);
+    } catch (e) {
+      setStatus(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
