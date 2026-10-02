@@ -12,6 +12,7 @@ import {
 import { ExerciseCard } from '../components/ExerciseCard';
 import { ExerciseSwapSheet } from '../components/ExerciseSwapSheet';
 import { AddExerciseSheet } from '../components/AddExerciseSheet';
+import { EditExerciseSheet } from '../components/EditExerciseSheet';
 import { DeloadBanner } from '../components/DeloadBanner';
 import { ProteinBadge } from '../components/ProteinBadge';
 import { Icon } from '../components/Icon';
@@ -49,6 +50,7 @@ export function TodayScreen() {
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null);
   const [reordering, setReordering] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Exercise | null>(null);
 
   const bySlug = useMemo(
     () => new Map(allExercises.map((e) => [e.slug, e])),
@@ -178,6 +180,17 @@ export function TodayScreen() {
     setAllExercises((prev) => [...prev, created]);
     await applyOrder([...order, created.slug]);
     setExpandedExerciseSlug(created.slug);
+  }
+
+  function handleExerciseSaved(updated: Exercise) {
+    setAllExercises((prev) =>
+      prev.map((e) => (e.slug === updated.slug ? updated : e)),
+    );
+  }
+
+  function handleExerciseDeleted(slug: string) {
+    setAllExercises((prev) => prev.filter((e) => e.slug !== slug));
+    if (order.includes(slug)) void applyOrder(order.filter((s) => s !== slug));
   }
 
   const { weekday, focus } = template
@@ -337,6 +350,7 @@ export function TodayScreen() {
                   }
                   swappedTo={session.swaps?.[ex.slug] ?? null}
                   onOpenSwap={() => setSwapTarget(ex)}
+                  onEdit={() => setEditTarget(ex)}
                   bodyweightKg={bodyweightKg}
                 />
               ))}
@@ -382,6 +396,15 @@ export function TodayScreen() {
           current={session?.swaps?.[swapTarget.slug] ?? null}
           onClose={() => setSwapTarget(null)}
           onSelect={handleSelectSwap}
+        />
+      )}
+
+      {editTarget && (
+        <EditExerciseSheet
+          exercise={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={handleExerciseSaved}
+          onDeleted={handleExerciseDeleted}
         />
       )}
 

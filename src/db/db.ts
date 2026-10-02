@@ -47,6 +47,12 @@ export interface Session {
   dayKey: AnyDayKey;
   notes?: string;
   completed: boolean;
+  /**
+   * Set when the app marked this session done on its own (the day after its
+   * last set change). A session is only auto-finished once, so reopening it
+   * by hand sticks. Not indexed — no schema version bump needed.
+   */
+  autoCompleted?: boolean;
   /** per-session exercise swaps: exerciseSlug → alternative display name. */
   swaps?: Record<string, string>;
   /**

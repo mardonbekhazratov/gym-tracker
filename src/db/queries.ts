@@ -8,6 +8,7 @@ import {
   type MuscleGroup,
 } from './db';
 import { todayISO } from '../lib/dates';
+import { sessionsToAutoComplete } from '../lib/autoComplete';
 
 export async function getOrCreateSessionForToday(
   dayKey: AnyDayKey,
@@ -89,6 +90,35 @@ export async function markSessionCompleted(
   await db.sessions.update(sessionId, { completed });
 }
 
+/**
+ * Mark done every open session whose last logged-set change happened before
+ * today (you trained, then forgot to tap "Finish session"). Runs on startup
+ * and whenever the app comes back to the foreground. Returns how many
+ * sessions were closed.
+ */
+export async function autoCompleteStaleSessions(
+  today: string = todayISO(),
+): Promise<number> {
+  const open = await db.sessions
+    .filter((s) => !s.completed && !s.autoCompleted)
+    .toArray();
+  if (open.length === 0) return 0;
+  const logs = await db.setLogs
+    .where('sessionId')
+    .anyOf(open.map((s) => s.id!))
+    .toArray();
+  const ids = sessionsToAutoComplete(open, logs, today, (ts) =>
+    todayISO(new Date(ts)),
+  );
+  if (ids.length === 0) return 0;
+  await db.transaction('rw', db.sessions, async () => {
+    for (const id of ids) {
+      await db.sessions.update(id, { completed: true, autoCompleted: true });
+    }
+  });
+  return ids.length;
+}
+
 export async function updateSessionNotes(
   sessionId: number,
   notes: string,
@@ -164,6 +194,71 @@ export async function createExercise(input: NewExerciseInput): Promise<Exercise>
   };
   const id = (await db.exercises.add(row)) as number;
   return { ...row, id };
+}
+
+/** Fields of an exercise the user can edit. The slug never changes. */
+export type ExercisePatch = Partial<
+  Pick<
+    Exercise,
+    | 'name'
+    | 'muscleGroup'
+    | 'defaultSets'
+    | 'repLow'
+    | 'repHigh'
+    | 'restSeconds'
+    | 'alternatives'
+  >
+>;
+
+/**
+ * Edit an exercise's definition (name, targets, rest, alternatives). Logs
+ * reference the slug, which is left untouched, so history stays attached.
+ * Returns the updated row.
+ */
+export async function updateExercise(
+  id: number,
+  patch: ExercisePatch,
+): Promise<Exercise | undefined> {
+  await db.exercises.update(id, patch);
+  return db.exercises.get(id);
+}
+
+export async function countSetLogsForExercise(slug: string): Promise<number> {
+  return db.setLogs.where('exerciseSlug').equals(slug).count();
+}
+
+/**
+ * Delete an exercise that has never been logged, and drop it from every day
+ * template and per-session order. Refuses if any set log references it, so
+ * history can never be orphaned.
+ */
+export async function deleteExercise(slug: string): Promise<void> {
+  await db.transaction(
+    'rw',
+    [db.exercises, db.dayTemplates, db.sessions, db.setLogs],
+    async () => {
+      if ((await countSetLogsForExercise(slug)) > 0) {
+        throw new Error('This exercise has logged sets and can’t be deleted.');
+      }
+      await db.exercises.where('slug').equals(slug).delete();
+      const templates = await db.dayTemplates.toArray();
+      for (const t of templates) {
+        if (t.exerciseSlugs.includes(slug)) {
+          await db.dayTemplates.update(t.id!, {
+            exerciseSlugs: t.exerciseSlugs.filter((x) => x !== slug),
+          });
+        }
+      }
+      const sessions = await db.sessions.toArray();
+      for (const s of sessions) {
+        if (s.exerciseOrder?.includes(slug)) {
+          await db.sessions.update(s.id!, {
+            exerciseOrder: s.exerciseOrder.filter((x) => x !== slug),
+          });
+        }
+      }
+    },
+  );
 }
 
 export async function recordBodyWeight(

@@ -5,6 +5,8 @@ import { dayKeyForDate } from '../lib/dates';
 interface RestTimerState {
   exerciseSlug: string;
   exerciseName: string;
+  /** When the rest began (ms epoch) — used to show total time rested. */
+  startedAt: number;
   endsAt: number;
   totalSeconds: number;
 }
@@ -36,15 +38,18 @@ export const useStore = create<UIState>((set, get) => ({
   setUnits: (u) => set({ units: u }),
 
   rest: null,
-  startRest: ({ exerciseSlug, exerciseName, seconds }) =>
+  startRest: ({ exerciseSlug, exerciseName, seconds }) => {
+    const now = Date.now();
     set({
       rest: {
         exerciseSlug,
         exerciseName,
-        endsAt: Date.now() + seconds * 1000,
+        startedAt: now,
+        endsAt: now + seconds * 1000,
         totalSeconds: seconds,
       },
-    }),
+    });
+  },
   addRest: (seconds) => {
     const cur = get().rest;
     if (!cur) return;

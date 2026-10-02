@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { db, type Settings } from '../db/db';
 import { BodyWeightInput } from '../components/BodyWeightInput';
 import { Icon } from '../components/Icon';
@@ -10,7 +11,7 @@ import { displayWeight, parseWeightToKg } from '../lib/units';
 import {
   exportBackup,
   importBackup,
-  triggerDownload,
+  saveBackup,
   type BackupFile,
 } from '../lib/backup';
 import { todayISO } from '../lib/dates';
@@ -66,12 +67,14 @@ export function SettingsScreen() {
   }
 
   async function handleExport() {
-    const backup = await exportBackup();
-    triggerDownload(
-      `workout-tracker-${todayISO()}.json`,
-      JSON.stringify(backup, null, 2),
-    );
-    setStatus(`Exported ${todayISO()}`);
+    const filename = `workout-tracker-${todayISO()}.json`;
+    try {
+      const backup = await exportBackup();
+      const dest = await saveBackup(filename, JSON.stringify(backup, null, 2));
+      setStatus(`Saved to ${dest}`);
+    } catch (e) {
+      setStatus(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -197,6 +200,16 @@ export function SettingsScreen() {
           onChange={(d) => void persist({ programStartDate: d })}
           eyebrow="Program start date"
         />
+        <Link
+          to="/settings/exercises"
+          className="btn-ghost w-full justify-between"
+        >
+          <span className="inline-flex items-center gap-2">
+            <Icon name="dumbbell" size={16} />
+            Manage exercises
+          </span>
+          <Icon name="chevron-right" size={16} className="text-ink-400" />
+        </Link>
       </section>
 
       <section className="card p-4 space-y-3">

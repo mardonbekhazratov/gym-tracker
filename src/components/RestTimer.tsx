@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Icon } from './Icon';
 
-function formatMMSS(totalSeconds: number): string {
-  const s = Math.max(0, Math.ceil(totalSeconds));
+/** Format whole seconds as m:ss. */
+function formatMMSS(seconds: number): string {
+  const s = Math.max(0, seconds);
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${m}:${String(r).padStart(2, '0')}`;
@@ -23,10 +24,15 @@ export function RestTimer() {
 
   if (!rest) return null;
 
-  const remaining = (rest.endsAt - Date.now()) / 1000;
+  const now = Date.now();
+  const remaining = (rest.endsAt - now) / 1000;
   const elapsed = rest.totalSeconds - remaining;
   const progress = Math.min(100, Math.max(0, (elapsed / rest.totalSeconds) * 100));
   const done = remaining <= 0;
+  // Once the countdown hits zero the timer keeps running, counting the
+  // overtime up, so you can see how long you actually rested.
+  const rested = Math.floor((now - rest.startedAt) / 1000);
+  const overtime = Math.floor(-remaining);
 
   return (
     <div
@@ -63,27 +69,45 @@ export function RestTimer() {
               className="transition-[stroke-dashoffset] duration-200"
             />
           </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-xs font-bold tabular-nums">
-            {done ? 'GO' : formatMMSS(remaining)}
+          <span
+            className={`absolute inset-0 flex items-center justify-center text-xs font-bold tabular-nums ${
+              done ? 'text-emerald-300' : ''
+            }`}
+          >
+            {done ? `+${formatMMSS(overtime)}` : formatMMSS(Math.ceil(remaining))}
           </span>
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="label-eyebrow">Rest</p>
-          <p className="text-sm font-semibold text-ink-50 truncate tracking-tighter-">
-            {rest.exerciseName}
-          </p>
+          {done ? (
+            <>
+              <p className="label-eyebrow text-emerald-300/90">Rest over · go</p>
+              <p className="text-sm font-semibold text-ink-50 truncate tracking-tighter-">
+                Rested <span className="num text-emerald-300">{formatMMSS(rested)}</span>
+                <span className="text-ink-400 font-medium"> · {rest.exerciseName}</span>
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="label-eyebrow">Rest</p>
+              <p className="text-sm font-semibold text-ink-50 truncate tracking-tighter-">
+                {rest.exerciseName}
+              </p>
+            </>
+          )}
         </div>
 
         <div className="flex gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={() => addRest(30)}
-            className="tap rounded-lg bg-ink-800 text-ink-100 px-2.5 py-1 text-xs font-semibold inline-flex items-center gap-0.5"
-          >
-            <Icon name="plus" size={12} />
-            30s
-          </button>
+          {!done && (
+            <button
+              type="button"
+              onClick={() => addRest(30)}
+              className="tap rounded-lg bg-ink-800 text-ink-100 px-2.5 py-1 text-xs font-semibold inline-flex items-center gap-0.5"
+            >
+              <Icon name="plus" size={12} />
+              30s
+            </button>
+          )}
           <button
             type="button"
             onClick={clearRest}
