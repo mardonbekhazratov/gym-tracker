@@ -8,6 +8,7 @@ import {
   type MuscleGroup,
 } from './db';
 import { todayISO } from '../lib/dates';
+import { sessionsToAutoComplete } from '../lib/autoComplete';
 
 export async function getOrCreateSessionForToday(
   dayKey: AnyDayKey,
@@ -87,6 +88,35 @@ export async function markSessionCompleted(
   completed = true,
 ): Promise<void> {
   await db.sessions.update(sessionId, { completed });
+}
+
+/**
+ * Mark done every open session whose last logged-set change happened before
+ * today (you trained, then forgot to tap "Finish session"). Runs on startup
+ * and whenever the app comes back to the foreground. Returns how many
+ * sessions were closed.
+ */
+export async function autoCompleteStaleSessions(
+  today: string = todayISO(),
+): Promise<number> {
+  const open = await db.sessions
+    .filter((s) => !s.completed && !s.autoCompleted)
+    .toArray();
+  if (open.length === 0) return 0;
+  const logs = await db.setLogs
+    .where('sessionId')
+    .anyOf(open.map((s) => s.id!))
+    .toArray();
+  const ids = sessionsToAutoComplete(open, logs, today, (ts) =>
+    todayISO(new Date(ts)),
+  );
+  if (ids.length === 0) return 0;
+  await db.transaction('rw', db.sessions, async () => {
+    for (const id of ids) {
+      await db.sessions.update(id, { completed: true, autoCompleted: true });
+    }
+  });
+  return ids.length;
 }
 
 export async function updateSessionNotes(

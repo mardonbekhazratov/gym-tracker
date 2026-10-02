@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import App from './App';
 import { seedIfEmpty } from './db/seed';
 import { migrateProgram } from './db/migrate';
+import { autoCompleteStaleSessions } from './db/queries';
 import './index.css';
 
 // Service worker policy:
@@ -63,6 +64,7 @@ async function boot() {
     if (reloading) return; // page is about to reload; skip the rest
     await seedIfEmpty();
     await migrateProgram();
+    await autoCompleteStaleSessions();
   } catch (err) {
     console.error('DB init failed', err);
   }
