@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import type { RestChimeMode } from '../lib/restChime';
 
 export type MuscleGroup =
   | 'chest'
@@ -87,6 +88,8 @@ export interface Settings {
   lastDeloadDate?: string;
   proteinPerKg: number;
   bodyweightForProteinKg?: number;
+  /** Rest-over chime; missing on older rows → DEFAULT_REST_CHIME. */
+  restChime?: RestChimeMode;
 }
 
 export class AppDB extends Dexie {

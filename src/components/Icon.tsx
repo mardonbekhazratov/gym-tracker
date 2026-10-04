@@ -27,6 +27,7 @@ type Variant =
   | 'protein'
   | 'calendar'
   | 'clock'
+  | 'bell'
   | 'target'
   | 'weight'
   | 'arrow-left'
@@ -259,6 +260,14 @@ export function Icon({
         <svg {...common}>
           <circle cx="12" cy="12" r="8.2" />
           <path d="M12 7.5V12l3 2.2" />
+        </svg>
+      );
+
+    case 'bell':
+      return (
+        <svg {...common}>
+          <path d="M6.4 16.6V11a5.6 5.6 0 0 1 11.2 0v5.6l1.6 1.6H4.8z" />
+          <path d="M10.1 20.4a2.1 2.1 0 0 0 3.8 0" />
         </svg>
       );
 

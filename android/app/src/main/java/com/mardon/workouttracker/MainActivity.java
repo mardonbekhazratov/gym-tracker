@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(DownloadsPlugin.class);
+        registerPlugin(RestChimePlugin.class);
         super.onCreate(savedInstanceState);
 
         // Edge-to-edge: WebView extends behind status & navigation bars.

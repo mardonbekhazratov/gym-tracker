@@ -11,7 +11,7 @@ export default defineConfig({
       // never active inside the Capacitor WebView — a stale precache there makes
       // the app run an old JS bundle that no longer matches the installed APK.
       injectRegister: false,
-      includeAssets: ['icon-192.png', 'icon-512.png', 'maskable-512.png'],
+      includeAssets: ['icon-192.png', 'icon-512.png', 'maskable-512.png', 'rest-chime.wav'],
       manifest: {
         name: 'Workout Tracker',
         short_name: 'Workout',
