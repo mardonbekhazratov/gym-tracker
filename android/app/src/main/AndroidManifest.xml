@@ -34,9 +34,20 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Plays the rest-over chime when its alarm fires. -->
+        <receiver
+            android:name=".RestChimeReceiver"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Exact rest-over chime. USE_EXACT_ALARM is auto-granted on Android 13+
+         (Play restricts it to alarm apps; this app is sideloaded). -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
 </manifest>

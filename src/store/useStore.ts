@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { DayKey } from '../db/db';
 import { dayKeyForDate } from '../lib/dates';
+import { DEFAULT_REST_CHIME, type RestChimeMode } from '../lib/restChime';
 
 interface RestTimerState {
   exerciseSlug: string;
@@ -20,6 +21,9 @@ interface UIState {
   units: 'kg' | 'lb';
   setUnits: (u: 'kg' | 'lb') => void;
 
+  restChime: RestChimeMode;
+  setRestChime: (m: RestChimeMode) => void;
+
   rest: RestTimerState | null;
   startRest: (input: { exerciseSlug: string; exerciseName: string; seconds: number }) => void;
   addRest: (seconds: number) => void;
@@ -36,6 +40,9 @@ export const useStore = create<UIState>((set, get) => ({
 
   units: 'kg',
   setUnits: (u) => set({ units: u }),
+
+  restChime: DEFAULT_REST_CHIME,
+  setRestChime: (m) => set({ restChime: m }),
 
   rest: null,
   startRest: ({ exerciseSlug, exerciseName, seconds }) => {

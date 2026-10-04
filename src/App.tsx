@@ -13,17 +13,23 @@ import { autoCompleteStaleSessions } from './db/queries';
 import { useStore } from './store/useStore';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { useAndroidBackButton } from './lib/useAndroidBackButton';
+import { useRestChime } from './lib/useRestChime';
+import { DEFAULT_REST_CHIME } from './lib/restChime';
 
 export default function App() {
   const setUnits = useStore((s) => s.setUnits);
+  const setRestChime = useStore((s) => s.setRestChime);
 
   useAndroidBackButton();
+  useRestChime();
 
   useEffect(() => {
     void db.settings.get(1).then((s) => {
-      if (s) setUnits(s.units);
+      if (!s) return;
+      setUnits(s.units);
+      setRestChime(s.restChime ?? DEFAULT_REST_CHIME);
     });
-  }, [setUnits]);
+  }, [setUnits, setRestChime]);
 
   // The app often sits in the background overnight; when it comes back, close
   // yesterday's session if it was never finished (startup does the same).

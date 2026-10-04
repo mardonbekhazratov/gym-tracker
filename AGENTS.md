@@ -55,6 +55,8 @@ npm run dev                         # Vite dev server, http://localhost:5173
 npm run build                       # tsc -b && vite build → dist/
 node scripts/test-navigation.mjs    # back-button routing rules
 node scripts/test-auto-complete.mjs # auto-finish-session rule
+node scripts/test-rest-chime.mjs    # rest-chime arming rule
+node scripts/gen-chime.mjs          # regenerate the chime WAV (public/ + res/raw/)
 ```
 
 There is no test framework or linter config; `npm run build` (strict tsc) is
@@ -88,7 +90,8 @@ debugging prompt on the phone.
 src/
   main.tsx            boot: service-worker policy → seedIfEmpty → migrateProgram
                       → autoCompleteStaleSessions → render
-  App.tsx             routes, rest timer, bottom nav, back button, resume hook
+  App.tsx             routes, rest timer + chime hook, bottom nav, back button,
+                      resume hook
   db/db.ts            Dexie schema + types (Exercise, DayTemplate, Session, SetLog, …)
   db/queries.ts       all reads/writes used by screens (sessions, sets, exercises,
                       bodyweight, volume, auto-finish, exercise edit/delete)
@@ -96,10 +99,12 @@ src/
   db/migrate.ts       idempotent data migrations (merged slugs, day templates)
   data/program.ts     the program: seed exercises, day templates, merged-slug map,
                       BODYWEIGHT_ONLY_SLUGS, six rules, weekly volume targets
-  store/useStore.ts   zustand UI state: selected day, expanded card, units, rest timer
+  store/useStore.ts   zustand UI state: selected day, expanded card, units, rest
+                      timer, rest-chime mode
   lib/                pure helpers: dates, units, epley, backup (export/import),
                       downloads (native plugin bridge), navigation + overlayStack
-                      + useAndroidBackButton, autoComplete
+                      + useAndroidBackButton, autoComplete, restChime (pure rule)
+                      + useRestChime (native plugin bridge + web fallback)
   components/         ExerciseCard, SetRow, RestTimer, sheets (Add/Edit/Swap
                       exercise), ExerciseFields (shared form), charts, banners
   components/ui/      primitives: Sheet, ConfirmDialog, NumberField, TextField,
@@ -107,8 +112,10 @@ src/
   screens/            Today, History, SessionDetail, Progress, Settings, Exercises
 android/              Capacitor project; custom code in
                       app/src/main/java/com/mardon/workouttracker/
-                      (MainActivity edge-to-edge + DownloadsPlugin)
-scripts/              gen-icons.mjs, test-*.mjs
+                      (MainActivity edge-to-edge, DownloadsPlugin,
+                      RestChimePlugin + RestChimeReceiver); chime sound in
+                      app/src/main/res/raw/rest_chime.wav
+scripts/              gen-icons.mjs, gen-chime.mjs, test-*.mjs
 ```
 
 Routes: `/` Today, `/history`, `/history/:sessionId`, `/progress`,
@@ -117,7 +124,9 @@ Routes: `/` Today, `/history`, `/history/:sessionId`, `/progress`,
 ## 5. Data model & invariants
 
 - Six tables: `exercises`, `dayTemplates`, `sessions`, `setLogs`,
-  `bodyWeights`, `settings` (single row, id 1).
+  `bodyWeights`, `settings` (single row, id 1). `settings.restChime`
+  (`headphones | always | off`, non-indexed) may be missing on older rows —
+  read it as `?? DEFAULT_REST_CHIME` (`headphones`).
 - **Weights are stored in kg**; `lib/units.ts` converts for display.
 - **Set logs reference exercises by `slug`**, never by id. Slugs are permanent:
   editing an exercise changes name/targets but never its slug.
@@ -141,6 +150,22 @@ Routes: `/` Today, `/history`, `/history/:sessionId`, `/progress`,
   every set save on the Today screen (not in History edits) from
   `exercise.restSeconds`. After zero it keeps running: ring shows `+m:ss`
   overtime and the text shows total time rested.
+- **Rest chime** (Settings → Rest chime: Headphones / Always / Off): one short
+  chime when rest ends, never a notification. The WebView stops running JS
+  once the screen locks, so `useRestChime()` (mounted in `App`) hands the
+  end time to the native `RestChime` plugin, which arms an exact
+  `AlarmManager` alarm (`USE_EXACT_ALARM`, auto-granted on Android 13+;
+  only one pending at a time). It is re-armed whenever `rest.endsAt` or the
+  mode changes (set saved, +30s) and cancelled on Skip/Done/Off; the rule is
+  `lib/restChime.ts`. `RestChimeReceiver` checks for wired/USB/Bluetooth
+  headphones *at fire time* (Headphones mode) and plays `res/raw/rest_chime.wav`
+  on the media stream with transient ducking focus — so it follows the active
+  output and silent mode doesn't mute it. Logs tag `RestChime`. Web fallback
+  is a `setTimeout` + `<audio>` (tab must be open, no headphone detection).
+  To test on the phone without logging sets, call
+  `Capacitor.Plugins.RestChime.schedule({ at: Date.now() + 10000, headphonesOnly: false })`
+  over the DevTools socket (§7) and check `adb logcat -s RestChime` and
+  `adb shell dumpsys alarm | grep RestChime`.
 - **Auto-finish sessions**: on boot and on `visibilitychange → visible`,
   `autoCompleteStaleSessions()` marks done every open session with ≥1 set whose
   latest set-log `timestamp` is on a calendar day before today. Only once per

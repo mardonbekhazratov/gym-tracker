@@ -15,10 +15,19 @@ import {
   type BackupFile,
 } from '../lib/backup';
 import { todayISO } from '../lib/dates';
+import { DEFAULT_REST_CHIME, type RestChimeMode } from '../lib/restChime';
+
+const REST_CHIME_OPTIONS: { value: RestChimeMode; label: string }[] = [
+  { value: 'headphones', label: 'Headphones' },
+  { value: 'always', label: 'Always' },
+  { value: 'off', label: 'Off' },
+];
 
 export function SettingsScreen() {
   const units = useStore((s) => s.units);
   const setUnits = useStore((s) => s.setUnits);
+  const restChime = useStore((s) => s.restChime);
+  const setRestChime = useStore((s) => s.setRestChime);
   const confirm = useConfirm();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [proteinPerKg, setProteinPerKg] = useState('1.8');
@@ -50,6 +59,11 @@ export function SettingsScreen() {
   async function handleUnitsToggle(next: 'kg' | 'lb') {
     setUnits(next);
     await persist({ units: next });
+  }
+
+  async function handleRestChime(next: RestChimeMode) {
+    setRestChime(next);
+    await persist({ restChime: next });
   }
 
   async function handleProteinCommit(value: string) {
@@ -99,6 +113,7 @@ export function SettingsScreen() {
       if (reloaded) {
         setSettings(reloaded);
         setUnits(reloaded.units);
+        setRestChime(reloaded.restChime ?? DEFAULT_REST_CHIME);
       }
       setStatus(`Imported ${file.name}`);
     } catch (err) {
@@ -144,6 +159,38 @@ export function SettingsScreen() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="card p-4 space-y-3">
+        <h2 className="font-semibold text-ink-100 inline-flex items-center gap-2">
+          <Icon name="bell" size={16} className="text-ember-400" />
+          Rest chime
+        </h2>
+        <div className="grid grid-cols-3 gap-2">
+          {REST_CHIME_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => void handleRestChime(value)}
+              className={`tap rounded-xl py-2.5 text-sm font-semibold border
+                ${
+                  restChime === value
+                    ? 'bg-ember-500 text-white border-ember-500 shadow-glow'
+                    : 'bg-ink-900/60 text-ink-200 border-ink-800'
+                }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-ink-400">
+          {restChime === 'headphones' &&
+            'A short chime when rest is over — only while headphones are connected.'}
+          {restChime === 'always' &&
+            'A short chime when rest is over, through headphones or the phone speaker.'}
+          {restChime === 'off' && 'No sound when rest is over.'}
+          {restChime !== 'off' && ' Plays at media volume, even with the screen off.'}
+        </p>
       </section>
 
       <BodyWeightInput units={units} onChange={() => setBwTick((n) => n + 1)} />
